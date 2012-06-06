@@ -362,6 +362,7 @@ function do_install_file() {
     local beefile="$(${BEE_BINDIR}/beeversion ${pkg} --format='%F').bee"
     local pkg=$(${BEE_BINDIR}/beeversion --format='%A' $file)
     local vv=""
+    local beesysconftransform=""
 
     if [ "${OPT_NOOP}" = "yes" ] ; then
         echo "INSTALL ${file}"
@@ -376,10 +377,30 @@ function do_install_file() {
 
     if [ -n "${BEE_BEEDESTDIR}" ] ; then
         changedir="--transform=s,^/,${BEE_BEEDESTDIR}/,"
+    else
+        # bee configuration management
+        # bee-sysconf: move sysconfig to BEE_METADIR and let bee-sysconf handle
+        # change logic and install remove sysconfig files.
+        # it is currently only active if BEE_BEEDESTDIR is *not* set.
+
+        # extract PKG_SYSCONFDIR
+        PKG_SYSCONFDIR=$( tar -xPOf "${file}" META 2>/dev/null | grep PKG_SYSCONFDIR )
+        PKG_SYSCONFDIR=${PKG_SYSCONFDIR#PKG_SYSCONFDIR=}
+
+        # remove trailing '/' - only one trailing slash is removed!!!
+        PKG_SYSCONFDIR=${PKG_SYSCONFDIR%/}
+        BEE_METASYSCONFDIR=${BEE_METADIR}/${pkg}/bee-sysconf
+
+        # in case META file does not contain PKG_SYSCONFDIR or it is empty
+        # -> do nothing
+        if [ -n "${PKG_SYSCONFDIR}" ] ; then
+            beesysconftransform="--transform=s,^${PKG_SYSCONFDIR}/,${BEE_METASYSCONFDIR}/,"
+        fi
     fi
 
     start_cmd tar -x --dereference -${vv}Pf ${file} \
         ${changedir} \
+        ${beesysconftransform} \
         --transform="s,^FILES$,${BEE_METADIR}/${pkg}/CONTENT.FILES," \
         --transform="s,^CONTENT$,${BEE_METADIR}/${pkg}/CONTENT.INSTALL," \
         --transform="s,^BUILD$,${BEE_METADIR}/${pkg}/${beefile}," \
@@ -419,6 +440,9 @@ function do_install_file() {
     mv ${BEE_METADIR}/${pkg}/CONTENT{.INSTALL,}
 
     bee-cache update ${pkg}
+
+    # force install sysconf files
+    ${BEE_LIBEXECDIR}/bee/bee.d/bee-sysconf install --force ${pkg}
 
     run_hooks post-install ${pkg}
 
