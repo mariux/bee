@@ -69,6 +69,7 @@ HELPER_BEE_SHELL+=bee-install
 HELPER_BEE_SHELL+=bee-list
 HELPER_BEE_SHELL+=bee-query
 HELPER_BEE_SHELL+=bee-remove
+HELPER_BEE_SHELL+=bee-sysconf
 HELPER_BEE_SHELL+=bee-update
 
 HELPER_C+=bee-cache-inventory

@@ -1,0 +1,199 @@
+#!/bin/bash
+#
+# bee-sysconf - manage pkg sysconf files
+#
+# Copyright (C) 2009-2012
+#       Marius Tolzmann <tolzmann@molgen.mpg.de>
+#       Tobias Dreyer <dreyer@molgen.mpg.de>
+#       and other bee developers
+#
+# This file is part of bee.
+#
+# bee is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+if [ -z "${BEE_VERSION}" ] ; then
+    echo >&2 "BEE-ERROR: please call $0 from bee .."
+    exit 1
+fi
+
+VERSION=${BEE_VERSION}
+
+: ${BEE_BINDIR:=@BINDIR@}
+
+function debug_msg() {
+    if [ "${OPT_DEBUG}" != "1" ] ; then
+        return
+    fi
+
+    info=( $(caller 0) )
+
+    echo "${info[2]}:${info[1]}:${info[0]}: ${@}" >&2
+}
+
+function start_cmd() {
+    debug_msg "executing '${@}'"
+
+    if [ "${OPT_NOOP}" = "no" ] ; then
+        "${@}"
+    fi
+}
+
+function assert() {
+    if [ ! "${@}" ] ; then
+        local info=( $(caller 0) )
+        echo "${info[2]}:${info[1]}:${info[0]}: Assertion [ ${@} ] failed. exiting.." >&2
+        exit 250
+    fi
+}
+
+##### usage ###################################################################
+function usage() {
+    cat <<-EOF
+	bee-install v${VERSION} 2009-2012
+	  by Marius Tolzmann and Tobias Dreyer <{tolzmann,dreyer}@molgen.mpg.de>
+	     Max Planck Institute for Molecular Genetics Berlin Dahlem
+
+	Usage: bee sysconf [options] <cmd> [cmd-options]
+
+	Options:
+	    -f, --force         can be used to force installation come what may
+	    -v, --verbose       be more verbose (can be used twice e.g. -vv)
+	    -n, --noop          do not install; just print what would be installed
+	    -h, --help          display this help
+
+	EOF
+}
+
+###############################################################################
+##
+##
+
+function bee_sysconf_install_force() {
+    pkg=${1}
+    source=${2}
+    destination=${3}
+    cpopts=""
+
+    if [ ${OPT_VERBOSE} -gt 0 ] ; then
+       cpopts="-v"
+    fi
+
+    debug_msg "force-install ${pkg}"
+
+    start_cmd cp ${cpopts} -ax ${source}/. ${destination}
+}
+
+function bee_sysconf_install() {
+    pkg=${1}
+    debug_msg "install ${pkg}"
+
+    beesysconfdir="${BEE_METADIR}/${pkg}/bee-sysconf"
+
+    if [ ! -d "${beesysconfdir}" ] ; then
+       debug_msg "${beesysconfdir}: No such directory."
+       return
+    fi
+
+    pkgmetafile="${BEE_METADIR}/${pkg}/META"
+    pkgsysconfdir=$( grep "PKG_SYSCONFDIR=" "${pkgmetafile}" )
+    pkgsysconfdir=${pkgsysconfdir#PKG_SYSCONFDIR=}
+    pkgsysconfdir=${pkgsysconfdir%/}
+
+    if [ -z "${pkgsysconfdir}" ] ; then
+        debug_msg "can't determine PKG_SYSCONFIDR (${pkgsysconfdir})"
+        return
+    fi
+
+    if [ ${OPT_FORCE} = "yes" ] ; then
+        bee_sysconf_install_force "${pkg}" "${beesysconfdir}" "${pkgsysconfdir}"
+    fi
+}
+
+function bee_sysconf_install_all() {
+    debug_msg "install_all ${@}"
+
+    for pkg in "${@}" ; do
+        bee_sysconf_install "${pkg}"
+    done
+}
+
+
+
+###############################################################################
+###############################################################################
+###############################################################################
+
+
+options=$(${BEE_BINDIR}/beegetopt --name bee-sysconf \
+                 --no-skip-unknown-option \
+                 --option verbose/v \
+                 --option force/f \
+                 --option help/h \
+                 --option debug/D \
+                 --option noop/n \
+                 -- "$@")
+
+if [ $? != 0 ] ; then
+    usage
+    exit 1
+fi
+eval set -- "${options}"
+
+declare -i OPT_VERBOSE=0
+declare -i OPT_DEBUG=0
+declare OPT_NOOP="no"
+declare OPT_UPDATE="no"
+declare OPT_DOWNGRADE="no"
+declare OPT_FORCE="no"
+declare OPT_REMOVEALL="no"
+
+while true ; do
+    case "$1" in
+      --verbose)
+        shift
+        OPT_VERBOSE=${OPT_VERBOSE}+1
+        ;;
+      --force)
+        shift
+        OPT_FORCE="yes"
+        ;;
+      --help)
+        usage
+        exit 0
+        ;;
+      --debug)
+        shift
+        OPT_DEBUG=${OPT_DEBUG}+1
+        ;;
+      --noop)
+        shift
+        OPT_NOOP="yes"
+        ;;
+      --)
+        shift
+        break
+        ;;
+    esac
+done
+
+cmd=$1
+shift
+
+case "${cmd}" in
+    install)
+        bee_sysconf_install_all "${@}"
+        ;;
+esac
+
