@@ -30,18 +30,14 @@
 #include <errno.h>
 
 #include "bee_version.h"
-#include "bee_version_compare.h"
-#include "bee_version_parse.h"
-#include "bee_version_output.h"
 #include "bee_tree.h"
 #include "bee_getopt.h"
 
 void my_free_key(void *key)
 {
-    struct beeversion *v = key;
+    struct bee_version *v = key;
 
-    free(v->string);
-    free(v);
+    bee_version_free(v);
 }
 
 void my_free_data(void *data)
@@ -51,7 +47,7 @@ void my_free_data(void *data)
 
 int my_compare_key(void *a, void *b)
 {
-    return compare_beepackages(a, b);
+    return bee_version_compare(a, b);
 }
 
 int my_compare_data(void *a, void *b)
@@ -64,18 +60,32 @@ void my_print(void *key, void *data)
     fputs(data, stdout);
 }
 
+static int dirty_bee_version_set_name(struct bee_version *v, char *s)
+{
+    char *p;
+
+    p = strdup(s);
+    if (!p)
+        return 0;
+
+    v->_input = p;
+    v->name   = p;
+    return 1;
+}
+
 void *my_generate_key(const void *data)
 {
     const char *line = data;
     size_t l;
     char *s, *p;
     char *string;
-    struct beeversion *v;
+    struct bee_version *v;
+    int res;
 
     string = strdup(line);
 
     if(!string) {
-        perror("calloc(s)");
+        perror("strdup");
         return NULL;
     }
 
@@ -95,17 +105,18 @@ void *my_generate_key(const void *data)
         return NULL;
     }
 
-    v = calloc(1, sizeof(*v));
+    v = bee_version_alloc();
+
     if(!v) {
-        perror("calloc(beeversion)");
+        perror("bee_version_alloc");
         free(string);
         return NULL;
     }
 
-    if(parse_version(s, v) != 0) {
-        free(v->string);
-        init_version(s, v);
-        v->pkgname = v->string;
+    if (!bee_version_parse(v, s, 0)) {
+        res = dirty_bee_version_set_name(v, s);
+        if (!res)
+            return NULL;
     }
 
     free(string);

@@ -26,11 +26,9 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <string.h>
+#include <assert.h>
 
 #include "bee_version.h"
-#include "bee_version_parse.h"
-#include "bee_version_compare.h"
-#include "bee_version_output.h"
 
 #define TEST_BITS 3
 #define TYPE_BITS 2
@@ -66,94 +64,90 @@
 #define OPT_KEYVALUE 129
 #define OPT_VERSION  130
 #define OPT_HELP     131
-#define OPT_FILTER_PKGFULLNAME 132
 
 #define MODE_TEST   1
 #define MODE_PARSE  2
 
-char *filter_pkgfullname = NULL;
-
-int compare_beeversions(struct beeversion *, struct beeversion *);
-char parse_extra(struct beeversion *);
-
 void print_version(void) {
     printf("beeversion v%d.%d.%d - "
-           "by Marius Tolzmann <tolzmann@molgen.mpg.de> 2010\n", 
+           "by Marius Tolzmann <tolzmann@molgen.mpg.de> 2010\n",
            BEEVERSION_MAJOR, BEEVERSION_MINOR, BEEVERSION_PATCHLVL);
 }
 
 void print_full_usage(void) {
 
     printf("usage:\n\n");
-    
-    
+
+
     printf("   test: beeversion <packageA> -{lt|le|gt|ge|eq|ne} <packageB>\n");
     printf(" filter: beeversion [filter-options] -{min|max} <package1> [.. <packageN>]\n");
     printf("  parse: beeversion [parse-options] <package>\n\n");
-    
+
     printf("         package := <pkgfullname>-<pkgfullversion>-<pkgrevision>\n");
     printf("                  | <pkgfullname>-<pkgfullversion>\n");
     printf("                  | <pkgfullversion>\n\n");
-    
+
     printf("     pkgfullname := <pkgname>\n");
     printf("                  | <pkgname>_<pkgsubname>\n\n");
-    
+
     printf("  pkgfullversion := <pkgversion>\n");
     printf("                  | <pkgversion>_<pkgextraversion>\n\n");
-    
+
     printf("     pkgrevision := <pkgrevision>\n");
     printf("                  | <pkgrevision>.<arch>\n\n");
-    
+
     printf("   filter-options:\n\n");
-
-    printf("      --filter-pkgfullname=<pkgfullname>\n\n");
-    
 }
 
-int parse_argument(char* text, struct beeversion *versionsnummer)
+int parse_argument(char *s, struct bee_version *v)
 {	
-    int p;
-    
-    if((p=parse_version(text, versionsnummer))) {
-        fprintf(stderr, "beeversion: syntax error at position %d in '%s'\n", p, text);
-        return(0);
+    int res;
+
+    res = bee_version_parse(v, s, 0);
+
+    if(!res) {
+        fprintf(stderr, "beeversion: can't parse '%s'\n", s);
+        return 0;
     }
-    return(1);
+    return 1;
 }
 
-static int compare_beepackages_gen(const void *a, const void *b) {
-    return((int)compare_beepackages((struct beeversion *)a, (struct beeversion *)b));
+int compare_beepackages_gen(const void *a, const void *b) {
+    return((int)bee_version_compare((struct bee_version *)a, (struct bee_version *)b));
 }
 
 int do_test(int argc, char *argv[], char test) {
     int i;
-    
-    struct beeversion v[2];
-    struct beeversion *a, *b, *va;
-    
+
+    struct bee_version v[2];
+    struct bee_version *a, *b, *va;
+
     int ret;
     char t;
-    
+
     a = &v[0];
     b = &v[1];
-    
+
     t = (test & TEST_MASK);
-    
+
+    bee_version_parse_start(a);
+    bee_version_parse_start(b);
+
     if((test & TEST_TYPE_MASK) == TEST_WITH_2_ARGS) {
         if(argc != 2) {
             fprintf(stderr, "usage: beeversion <packageA> -[lt|le|gt|ge|eq|ne] <packageB>\n");
             return(255);
         }
-        
+
         for(i=0; i<2; i++) {
             if(!parse_argument(argv[i], &v[i]))
                return(0);
         }
-        
-        ret = compare_beeversions(a, b);
 
-        free(a->string);
-        free(b->string);
+        ret = bee_version_compare(a, b);
+
+        bee_version_parse_finish(a);
+        bee_version_parse_finish(b);
 
         switch(t) {
             case T_LESS_THAN:
@@ -170,69 +164,74 @@ int do_test(int argc, char *argv[], char test) {
                 return(ret != 0);
         }
         fprintf(stderr, "beeversion: YOU HIT A BUG #004\n");
+        assert(0);
+        return 0;
     }
-    
+
     /* min / max */
     if((test & TEST_TYPE_MASK) == TEST_WITH_2_OR_MORE_ARGS) {
-        
+
         if(argc < 1) {
             fprintf(stderr, "usage: beeversion -[min|max] <package1> [<package2> .. <packageN>]\n");
             return(255);
         }
-        
-        if(!(va = calloc(sizeof(struct beeversion), argc))) {
+
+        if(!(va = calloc(sizeof(*va), argc))) {
             perror("va=calloc()");
             exit(255);
         }
-        
+
         for(i=0;i<argc;i++) {
+            bee_version_parse_start(va+i);
             if(!parse_argument(argv[i], va+i))
                 return(0);
         }
-        
-        qsort(va, argc, sizeof(struct beeversion), compare_beepackages_gen);
-        
+
+        qsort(va, argc, sizeof(*va), compare_beepackages_gen);
+
         for(a=va,i=1;i<argc;i++) {
             b=va+i;
-            
+
             /* a != b */
-            if(compare_beepackage_names(a, b)) {
-                print_format("%A\n", a, filter_pkgfullname);
+            if(bee_version_compare_pkgfullname(a, b)) {
+                bee_version_print("%A\n", a);
                 a = b;
             }
-            
-            if(t == T_MAX) 
+
+            if(t == T_MAX)
                a = b;
         }
-        print_format("%A\n", a, filter_pkgfullname);
+        bee_version_print("%A\n", a);
 
-        for(i=0;i<argc;i++) {
-            free(va[i].string);
+        for (i=0;i<argc;i++) {
+            bee_version_parse_finish(va+i);
         }
 
         free(va);
         return(1);
     }
-    
+
     fprintf(stderr, "beeversion: YOU HIT A BUG #006\n");
-    
+
     return(0);
 }
 
 int do_parse(int argc, char *argv[], char *format) {
-    struct beeversion v;
-    
+    struct bee_version v;
+
     if(argc != 1) {
-        fprintf(stderr, "usage: beeversion <package>\n"); 
+        fprintf(stderr, "usage: beeversion <package>\n");
         return(255);
     }
-    
+
+    bee_version_parse_start(&v);
+
     if(!parse_argument(argv[0], &v))
         return(0);
-    
-    print_format(format, &v, filter_pkgfullname);
 
-    free(v.string);
+    bee_version_print(format, &v);
+
+    bee_version_parse_finish(&v);
 
     return(1);
 }
@@ -241,15 +240,15 @@ int main(int argc, char *argv[])
 {
     int option_index = 0;
     int c = 0;
-        
+
     char test_to_do   = 0;
     char *format      = NULL;
     int  test_index   = 0;
     int  build_format = 0;
     char mode         = 0;
-    
+
     char *keyvalue;
-    
+
     keyvalue = "PKGNAME=%p\n"
                "PKGEXTRANAME=%x\n"
                "PKGEXTRANAME_UNDERSCORE=%_x\n"
@@ -291,7 +290,7 @@ int main(int argc, char *argv[])
         /*
         {"keyvalue",       no_argument, 0, OPT_KEYVALUE},
         */
-        
+
         /*  */
         {"pkgfullname",    no_argument,  0, 'P'},
         {"pkgfullversion", no_argument,  0, 'V'},
@@ -304,20 +303,18 @@ int main(int argc, char *argv[])
         {"pkgextraversion", no_argument, 0, 'e'},
         {"pkgrevision",     no_argument, 0, 'r'},
         {"pkgsuffix",       no_argument, 0, 's'},
-        
+
         {"pkgextraname",    no_argument, 0, 'x'},
         {"pkgsubname",      no_argument, 0, 'x'},
-        
-        {"filter-pkgfullname", required_argument, 0, OPT_FILTER_PKGFULLNAME},
-        
+
         {"version",     no_argument, 0, OPT_VERSION},
         {"help",        no_argument, 0, OPT_HELP},
 
         {0, 0, 0, 0}
     };
-    
+
     while ((c = getopt_long_only(argc, argv, "PAVFpaversx", long_options, &option_index)) != -1) {
-    
+
         if( (c & TEST_TYPE_MASK) && ! (c & ~TEST_FULL_MASK)) {
             if(mode && mode == MODE_PARSE) {
                 fprintf(stderr, "beeversion: skipping test-option --%s since already running in parse mode\n",
@@ -334,27 +331,22 @@ int main(int argc, char *argv[])
             test_to_do = c;
             continue;
         }
-        
-        if(c == OPT_FILTER_PKGFULLNAME) {
-            filter_pkgfullname = optarg;
-            continue;
-        }
-        
+
         if(mode && mode == MODE_TEST) {
             fprintf(stderr, "beeversion: skipping parse-option --%s since already running in test mode\n",
                       long_options[option_index].name);
             continue;
         }
-        
+
         mode = MODE_PARSE;
-        
+
         /* define format */
         if((c >= 'A' && c <= 'z')) {
             if(format && ! build_format) {
                 fprintf(stderr, "beeversion: --%s ignored\n", long_options[option_index].name);
                 continue;
             }
-            
+
             if(!format) {
                 format = calloc(sizeof(char), argc * 3 + 2);
                 if(!format) {
@@ -362,15 +354,15 @@ int main(int argc, char *argv[])
                     exit(255);
                 }
             }
-            
+
             if(build_format)
                 format[build_format++] = ' ';
-                
+
             format[build_format++] = '%';
             format[build_format++] = c;
             continue;
         }
-        
+
         if(c == OPT_FORMAT) {
             if(format) {
                 fprintf(stderr, "beeversion: --%s ignored\n", long_options[option_index].name);
@@ -379,7 +371,7 @@ int main(int argc, char *argv[])
             format = optarg;
             continue;
         }
-        
+
         if(c == OPT_KEYVALUE) {
             if(format) {
                 fprintf(stderr, "beeversion: --%s ignored\n", long_options[option_index].name);
@@ -388,7 +380,7 @@ int main(int argc, char *argv[])
             format = keyvalue;
             continue;
         }
-        
+
         if(c == OPT_HELP) {
             printf("\n");
             print_version();
@@ -396,32 +388,30 @@ int main(int argc, char *argv[])
             print_full_usage();
             exit(0);
         }
-        
+
         if(c == OPT_VERSION) {
             print_version();
             exit(0);
         }
-        
+
         if(opterr)
            continue;
-        
+
         fprintf(stderr, "beeversion: YOU HIT A BUG #003 opterr=%d\n", opterr);
     }  /* end while getopt_long_only */
-    
+
     if(build_format)
         format[build_format++] = '\n';
-    
-    if(mode == MODE_TEST) 
+
+    if(mode == MODE_TEST)
         return(!do_test(argc-optind, argv+optind, test_to_do));
-    
+
     if(!mode || mode == MODE_PARSE) {
         if(!format)
             format = keyvalue;
-        
-        filter_pkgfullname = NULL;
-        
+
         return(!do_parse(argc-optind, argv+optind, format));
     }
-        
+
     return(0);
 }
