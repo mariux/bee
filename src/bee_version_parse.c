@@ -87,7 +87,7 @@ void bee_version_free(struct bee_version *v)
     free(v);
 }
 
-static int _parse_setup(struct bee_version *v, char *input)
+BEE_STATIC_INLINE int _parse_setup(struct bee_version *v, char *input)
 {
     char   *s;
     size_t  len;
@@ -121,7 +121,7 @@ static int _parse_setup(struct bee_version *v, char *input)
     return 1;
 }
 
-static short _is_local_arch(char *s) {
+BEE_STATIC_INLINE short _is_local_arch(char *s) {
     static struct utsname unm;
     static char *machine = NULL;
 
@@ -136,7 +136,7 @@ static short _is_local_arch(char *s) {
     return !strcmp(s, machine);
 }
 
-static short _is_supported_arch(char *s)
+BEE_STATIC_INLINE short _is_supported_arch(char *s)
 {
     char *supported[] = { SUPPORTED_ARCHITECTURES, NULL };
     char **a;
@@ -150,7 +150,7 @@ static short _is_supported_arch(char *s)
 }
 
 /* set v->prefix and v->name */
-static short _parse_prefix(struct bee_version *v)
+BEE_STATIC_INLINE short _parse_prefix(struct bee_version *v)
 {
     char *p;
 
@@ -172,8 +172,7 @@ static short _parse_prefix(struct bee_version *v)
     return 1;
 }
 
-
-static short _parse_suffix(struct bee_version *v)
+BEE_STATIC_INLINE short _parse_suffix(struct bee_version *v) 
 {
     char *p;
 
@@ -195,7 +194,7 @@ static short _parse_suffix(struct bee_version *v)
     return 1;
 }
 
-static short _parse_arch(struct bee_version *v)
+BEE_STATIC_INLINE short _parse_arch(struct bee_version *v)
 {
     char *p;
 
@@ -222,7 +221,7 @@ static short _parse_arch(struct bee_version *v)
     return 1;
 }
 
-static short _contains_invalid_chars(char *s, char *ok)
+BEE_STATIC_INLINE short _contains_invalid_chars(char *s, char *ok)
 {
     size_t accepted;
     size_t len;
@@ -303,7 +302,7 @@ static int _verify_fullname_string(char *s)
     return 1;
 }
 
-static int _parse_pkgfullversion(struct bee_version *v)
+BEE_STATIC_INLINE int _parse_pkgfullversion(struct bee_version *v)
 {
     char *p;
 
@@ -319,7 +318,7 @@ static int _parse_pkgfullversion(struct bee_version *v)
     return 1;
 }
 
-static int _parse_pkgfullname(struct bee_version *v)
+BEE_STATIC_INLINE int _parse_pkgfullname(struct bee_version *v)
 {
     char *p;
 
@@ -386,7 +385,7 @@ restore_revision:
 
 }
 
-static short _is_valid_revision_string(char *s)
+BEE_STATIC_INLINE short _is_valid_revision_string(char *s)
 {
 
     assert(s);
@@ -403,7 +402,7 @@ static short _is_valid_revision_string(char *s)
     return 1;
 }
 
-static short _is_valid_fullversion_string(char *s)
+BEE_STATIC_INLINE short _is_valid_fullversion_string(char *s)
 {
 
     assert(s);

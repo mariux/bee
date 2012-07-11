@@ -54,6 +54,8 @@ struct bee_version {
 
 #define BEE_DEPRECATED __attribute__((__deprecated__))
 
+#define BEE_STATIC_INLINE __attribute__((always_inline)) static inline
+
 void bee_version_parse_start(struct bee_version *v);
 void bee_version_parse_finish(struct bee_version *v);
 void bee_version_parse_reset(struct bee_version *v);
