@@ -291,6 +291,11 @@ static int _verify_fullname_string(char *s)
 
     assert(s);
 
+    if (!isalpha(*s)) {
+        fprintf(stderr, "beeversion: ERROR name does not start with an alphabetic character (%s).\n", s);
+        return 0;
+    }
+
     len      = strlen(s);
     accepted = strspn(s, _BEE_ACCEPT_FULLNAME);
 
@@ -426,10 +431,13 @@ static short _is_valid_fullname_string(char *s)
     assert(s);
 
     if (!*s)
-       return 0;
+        return 0;
+
+    if (!isalpha(*s))
+        return 0;
 
     if (_contains_invalid_chars(s, _BEE_ACCEPT_FULLNAME))
-       return 0;
+        return 0;
 
     return 1;
 }
