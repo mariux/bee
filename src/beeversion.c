@@ -70,7 +70,7 @@
 
 void print_version(void) {
     printf("beeversion v%d.%d.%d - "
-           "by Marius Tolzmann <tolzmann@molgen.mpg.de> 2010\n",
+           "by Marius Tolzmann <tolzmann@molgen.mpg.de> 2010-2012\n",
            BEEVERSION_MAJOR, BEEVERSION_MINOR, BEEVERSION_PATCHLVL);
 }
 
@@ -249,22 +249,6 @@ int main(int argc, char *argv[])
 
     char *keyvalue;
 
-    keyvalue = "PKGNAME=%p\n"
-               "PKGEXTRANAME=%x\n"
-               "PKGEXTRANAME_UNDERSCORE=%_x\n"
-               "PKGEXTRANAME_DASH=%-x\n"
-               "PKGVERSION=( @v )\n"
-               "PKGEXTRAVERSION=%e\n"
-               "PKGEXTRAVERSION_UNDERSCORE=%_e\n"
-               "PKGEXTRAVERSION_DASH=%-e\n"
-               "PKGREVISION=%r\n"
-               "PKGARCH=%a\n"
-               "PKGFULLNAME=%P\n"
-               "PKGFULLVERSION=%V\n"
-               "PKGFULLPKG=%F\n"
-               "PKGALLPKG=%A\n"
-               "PKGSUFFIX=%s\n";
-
     struct option long_options[] = {
         /* tests  with 2 args */
         {"lt",    no_argument, 0, TEST_WITH_2_ARGS|T_LESS_THAN},
@@ -312,6 +296,22 @@ int main(int argc, char *argv[])
 
         {0, 0, 0, 0}
     };
+
+    keyvalue = "PKGNAME=%p\n"
+               "PKGEXTRANAME=%x\n"
+               "PKGEXTRANAME_UNDERSCORE=%_x\n"
+               "PKGEXTRANAME_DASH=%-x\n"
+               "PKGVERSION=( @v )\n"
+               "PKGEXTRAVERSION=%e\n"
+               "PKGEXTRAVERSION_UNDERSCORE=%_e\n"
+               "PKGEXTRAVERSION_DASH=%-e\n"
+               "PKGREVISION=%r\n"
+               "PKGARCH=%a\n"
+               "PKGFULLNAME=%P\n"
+               "PKGFULLVERSION=%V\n"
+               "PKGFULLPKG=%F\n"
+               "PKGALLPKG=%A\n"
+               "PKGSUFFIX=%s\n";
 
     while ((c = getopt_long_only(argc, argv, "PAVFpaversx", long_options, &option_index)) != -1) {
 
