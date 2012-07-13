@@ -236,6 +236,50 @@ int do_parse(int argc, char *argv[], char *format) {
     return(1);
 }
 
+static int _beeversion_do_parse(int argc, char *argv[], char *format, int mode)
+{
+    struct bee_version v;
+    int res;
+    int i;
+
+    bee_version_parse_start(&v);
+
+    for (i=0; i < argc; i++) {
+        res = bee_version_parse(&v, argv[i], mode);
+        if (!res)
+            return 0;
+        bee_version_print_indexed(format, &v, i);
+    }
+
+    bee_version_parse_finish(&v);
+    return 1;
+}
+
+int beeversion_parse(int argc, char *argv[])
+{
+    char *format;
+    int mode = 0;
+
+    format   = "PKGNAME%_i=%p\n"
+               "PKGEXTRANAME%_i=%x\n"
+               "PKGEXTRANAME_UNDERSCORE%_i=%_x\n"
+               "PKGEXTRANAME_DASH%_i=%-x\n"
+               "PKGVERSION%_i=( @v )\n"
+               "PKGEXTRAVERSION%_i=%e\n"
+               "PKGEXTRAVERSION_UNDERSCORE%_i=%_e\n"
+               "PKGEXTRAVERSION_DASH%_i=%-e\n"
+               "PKGREVISION%_i=%r\n"
+               "PKGARCH%_i=%a\n"
+               "PKGFULLNAME%_i=%P\n"
+               "PKGFULLVERSION%_i=%V\n"
+               "PKGFULLPKG%_i=%F\n"
+               "PKGALLPKG%_i=%A\n"
+               "PKGSUFFIX%_i=%s\n";
+
+    return _beeversion_do_parse(argc, argv, format, mode);
+}
+
+
 int main(int argc, char *argv[])
 {
     int option_index = 0;
@@ -312,6 +356,15 @@ int main(int argc, char *argv[])
                "PKGFULLPKG=%F\n"
                "PKGALLPKG=%A\n"
                "PKGSUFFIX=%s\n";
+
+    if (argc > 1) {
+        if (strcmp(argv[1], "parse") == 0) {
+            return !beeversion_parse(argc-2, &argv[2]);
+        } else if(0) {
+            return !beeversion_parse(argc-1, &argv[1]);
+        }
+    }
+
 
     while ((c = getopt_long_only(argc, argv, "PAVFpaversx", long_options, &option_index)) != -1) {
 
