@@ -70,6 +70,6 @@ done < <(
               -e "s,.*\(RPATH\|RUNPATH\).*\[\(.*\)],#RPATH :\2 ," \
               -e "/^#RPATH / s,:,\nR rpath:,g;" ) \
 | sed -e 's,/\+,/,g' \
-      -e 's,/[^/]\+/\.\./,/,g' \
+      -e ':loop s,/[^/]\+/\.\./,/,g; t loop' \
       -e 's,/\./,/,g' \
 | sort -u
