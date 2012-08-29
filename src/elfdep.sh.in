@@ -1,60 +1,75 @@
 #!/bin/bash
 
-set -e
-
 pkg="$1 "
 
-while read infile ; do
+runpath=()
+needs=()
+fname=""
 
-    runpath=()
+while read cmd data ; do
+    if [ "${cmd:0:1}" = "#" ] ; then
+        continue
+    fi
 
-    while read cmd data ; do
-        if [ "${cmd:0:1}" = "#" ] ; then
-            continue
-        fi
-
-        escinfile=${infile//%/%25}
-        escinfile=${escinfile// /%20}
-        origin="${infile%/*}/"
-
-        # sort -ur makes R to appear first..
-        # so we can collect all rpathes before expanding them
-        case "${cmd}" in
-            "R")
-                # extract rpath from "rpath:" string..
-                rpath="${data:6}"
-
-                # handle ${ORIGIN} in rpath
-                rpath="${rpath//\$ORIGIN/${origin}}"
-
-                # save rpath
-                runpath=( "${runpath[@]}" "${rpath}" )
-                ;;
-            "N")
+    # sort -ur makes R to appear first..
+    # so we can collect all rpathes before expanding them
+    case "${cmd}" in
+        "END")
+            for n in "${needs[@]}" ; do
                 for p in "${runpath[@]}" ; do
-                    echo "${pkg}N ${p}/${data:7} ${data} ${infile}"
+                    echo "${pkg}N ${p}/${n:7} ${n} ${fname}"
                 done
-                echo "${pkg}N LDDYNPATH/${data:7} ${data} ${infile}"
-                ;;
-            "P")
-                if [ "${infile##*/}" != "${data:7}" ] ; then
-                    echo "${pkg}P ${escinfile%/*}/${data:7} ${data} ${infile}"
-                fi
-                echo "${pkg}P ${escinfile} ${data} ${infile}"
-                ;;
-            *)
-                echo >&2 "Unknown command: '${cmd}': aborting."
-                exit 1
-                ;;
-        esac
+                echo "${pkg}N LDDYNPATH/${n:7} ${n} ${fname}"
+            done
+            ;;
 
-    done < <(readelf -d "${infile}" 2>/dev/null \
-        | grep -E "(NEEDED|SONAME|RPATH|RUNPATH)" \
+        "START")
+            fname="${data}"
+            escinfile=${fname//%/%25}
+            escinfile=${escinfile// /%20}
+            origin="${fname%/*}/"
+            runpath=()
+            needs=()
+            ;;
+
+        "R")
+            # extract rpath from "rpath:" string..
+            rpath="${data:6}"
+
+            # handle ${ORIGIN} in rpath
+            rpath="${rpath//\$ORIGIN/${origin}}"
+
+            # save rpath
+            runpath=( "${runpath[@]}" "${rpath}" )
+            ;;
+
+        "N")
+            needs=( "${needs[@]}" ${data} )
+            ;;
+
+        "P")
+            if [ "${fname##*/}" != "${data:7}" ] ; then
+                echo "${pkg}P ${escinfile%/*}/${data:7} ${data} ${fname}"
+            fi
+            echo "${pkg}P ${escinfile} ${data} ${fname}"
+            ;;
+
+        *)
+            echo >&2 "Unknown command: '${cmd}': aborting."
+            exit 1
+            ;;
+    esac
+done < <(
+   while read infile ; do
+       echo "START ${infile}"
+       readelf -d "${infile}" 2>/dev/null
+       echo "END ${infile}"
+   done | grep -E "(^START|^END|NEEDED|SONAME|RPATH|RUNPATH)" \
         | sed -e "s,.*(NEEDED).*\[\(.*\)],N soname:\1 ," \
               -e "s,.*(SONAME).*\[\(.*\)],P soname:\1 ," \
               -e "s,.*\(RPATH\|RUNPATH\).*\[\(.*\)],#RPATH :\2 ," \
-              -e "/^#RPATH / s,:,\nR rpath:,g;" \
-        | sort -ur )
-done | sed -e 's,/\+,/,g' \
-           -e 's,/[^/]\+/\.\./,/,g' \
-           -e 's,/\./,/,g'
+              -e "/^#RPATH / s,:,\nR rpath:,g;" ) \
+| sed -e 's,/\+,/,g' \
+      -e 's,/[^/]\+/\.\./,/,g' \
+      -e 's,/\./,/,g' \
+| sort -u
