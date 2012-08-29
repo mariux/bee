@@ -78,6 +78,7 @@ HELPER_SHELL+=compat-fixmetadir
 HELPER_SHELL+=content2filelist
 HELPER_SHELL+=filelist2content
 HELPER_SHELL+=bee-cache-update
+HELPER_SHELL+=elfdep
 
 LIBRARY_SHELL+=beelib.config.sh
 
