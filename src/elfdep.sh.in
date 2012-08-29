@@ -6,6 +6,8 @@ runpath=()
 needs=()
 fname=""
 
+destdir=""
+
 while read cmd data ; do
     if [ "${cmd:0:1}" = "#" ] ; then
         continue
@@ -40,7 +42,13 @@ while read cmd data ; do
             rpath="${rpath//\$ORIGIN/${origin}}"
 
             # save rpath
-            runpath=( "${runpath[@]}" "${rpath}" )
+            runpath+=( "${rpath}" )
+
+            rrpath=$(readlink -f "${destdir}/${rpath}")
+
+            if [ "${rpath}" != "${rrpath}" ] ; then
+                runpath+=( "${rrpath#${destdir}}" )
+            fi
             ;;
 
         "N")
