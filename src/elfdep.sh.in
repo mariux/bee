@@ -5,6 +5,8 @@ pkg="$1 "
 runpath=()
 needs=()
 fname=""
+class=""
+type=""
 
 destdir=""
 
@@ -32,6 +34,19 @@ while read cmd data ; do
             origin="${fname%/*}/"
             runpath=()
             needs=()
+            class=""
+            type=""
+            ;;
+
+        "CLASS")
+            class=${data}
+            ;;
+
+        "TYPE")
+            type=${data}
+            if [ "${type}" = "DYN" ] ; then
+                echo "${pkg}P ${escinfile} soname:${fname##*/} ${fname}"
+            fi
             ;;
 
         "R")
@@ -59,7 +74,6 @@ while read cmd data ; do
             if [ "${fname##*/}" != "${data:7}" ] ; then
                 echo "${pkg}P ${escinfile%/*}/${data:7} ${data} ${fname}"
             fi
-            echo "${pkg}P ${escinfile} ${data} ${fname}"
             ;;
 
         *)
@@ -70,13 +84,15 @@ while read cmd data ; do
 done < <(
    while read infile ; do
        echo "START ${infile}"
-       readelf -d "${infile}" 2>/dev/null
+       readelf -hd "${infile}" 2>/dev/null
        echo "END ${infile}"
-   done | grep -E "(^START|^END|NEEDED|SONAME|RPATH|RUNPATH)" \
+   done | grep -E "(^START|^END|Class:|Type:|NEEDED|SONAME|RPATH|RUNPATH)" \
         | sed -e "s,.*(NEEDED).*\[\(.*\)],N soname:\1 ," \
               -e "s,.*(SONAME).*\[\(.*\)],P soname:\1 ," \
               -e "s,.*\(RPATH\|RUNPATH\).*\[\(.*\)],#RPATH :\2 ," \
-              -e "/^#RPATH / s,:,\nR rpath:,g;" ) \
+              -e "/^#RPATH / s,:,\nR rpath:,g;" \
+              -e "s,^.*Class:\ \+\([^ ]\+\).*,CLASS \1," \
+              -e "s,^.*Type:\ \+\([^ ]\+\).*,TYPE \1," ) \
 | sed -e 's,/\+,/,g' \
       -e ':loop s,/[^/]\+/\.\./,/,g; t loop' \
       -e 's,/\./,/,g' \
