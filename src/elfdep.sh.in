@@ -10,6 +10,8 @@ type=""
 
 destdir=""
 
+declare -A canpath
+
 while read cmd data ; do
     if [ "${cmd:0:1}" = "#" ] ; then
         continue
@@ -61,7 +63,11 @@ while read cmd data ; do
             # save rpath
             runpath+=( "${rpath}" )
 
-            rrpath=$(readlink -f "${destdir}/${rpath}")
+            if [ -z "${canpath[$rpath]}" ] ; then
+                canpath[$rpath]=$(readlink -f "${destdir}/${rpath}")
+            fi
+
+            rrpath=${canpath[$rpath]}
 
             if [ "$?" = "0" -a -n "${rrpath}" -a "${rpath}" != "${rrpath}" ] ; then
                 runpath+=( "${rrpath#${destdir}}" )
