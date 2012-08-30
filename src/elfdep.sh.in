@@ -23,6 +23,7 @@ while read cmd data ; do
                 for p in "${runpath[@]}" ; do
                     echo "${pkg}N ${p}/${n:7} ${n} ${fname}"
                 done
+                echo "${pkg}N PKGINTERNAL/${n:7} ${n} ${fname}"
                 echo "${pkg}N LDDYNPATH/${n:7} ${n} ${fname}"
             done
             ;;
@@ -46,6 +47,7 @@ while read cmd data ; do
             type=${data}
             if [ "${type}" = "DYN" ] ; then
                 echo "${pkg}P ${escinfile} soname:${fname##*/} ${fname}"
+                echo "${pkg}P PKGINTERNAL/${escinfile##*/} soname:${fname##*/} ${fname}"
             fi
             ;;
 
