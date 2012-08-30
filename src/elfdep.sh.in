@@ -61,7 +61,7 @@ while read cmd data ; do
 
             rrpath=$(readlink -f "${destdir}/${rpath}")
 
-            if [ "${rpath}" != "${rrpath}" ] ; then
+            if [ "$?" = "0" -a -n "${rrpath}" -a "${rpath}" != "${rrpath}" ] ; then
                 runpath+=( "${rrpath#${destdir}}" )
             fi
             ;;
