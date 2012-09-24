@@ -82,8 +82,8 @@ else
 fi
 
 echo -n "${PROG}: Testing values with many ' characters: "
-OUTPUT=$(./beesep "file=foo'bar:foo=bar:baz=b'o'b:twak='b'q'':foo=ba123'" 2>/dev/null)
-COMPARE=$(echo -e "file='foo'\''bar'\nfoo='bar'\nbaz='b'\''o'\''b'\ntwak=''\''b'\''q'\'''\'''\nfoo='ba123'\'''")
+OUTPUT=$(./beesep "file='foo'bar:foo=bar:baz=b'o'b:twak='b'q'':foo=ba123':bar='''" 2>/dev/null)
+COMPARE=$(echo -e "file=''\''foo'\''bar'\nfoo='bar'\nbaz='b'\''o'\''b'\ntwak=''\''b'\''q'\'''\'''\nfoo='ba123'\'''\nbar=''\'''\'''\'''")
 
 if [ "${OUTPUT[@]}" != "${COMPARE[@]}" ]; then
     failed

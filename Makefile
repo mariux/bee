@@ -118,6 +118,7 @@ CONFIG_FILES+=skiplist
 CONFIG_FILES+=beerc
 
 BEE_TESTS+=beesep
+BEE_TESTS+=beeversion
 
 .SUFFIXES: .in .sh .sh.in
 
