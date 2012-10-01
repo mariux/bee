@@ -46,8 +46,10 @@ static void bee_fnprint(FILE *fh, size_t n, char *str)
     if (!n)
         return;
 
-    while ((m = fwrite(str, sizeof(*str), n, fh)) != n)
-        n -= m;
+    while ((m = fwrite(str, sizeof(*str), n, fh)) != n) {
+        n   -= m;
+        str += m;
+    }
 }
 
 static void print_escaped(char *s, size_t n)
