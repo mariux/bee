@@ -45,6 +45,10 @@ function bee-remove() {
     ${BEE_LIBEXECDIR}/bee/bee.d/bee-remove "${@}"
 }
 
+function bee-sysconf() {
+    ${BEE_LIBEXECDIR}/bee/bee.d/bee-sysconf "${@}"
+}
+
 function debug_msg() {
     if [ "${OPT_DEBUG}" != "1" ] ; then
         return
@@ -442,7 +446,7 @@ function do_install_file() {
     bee-cache update ${pkg}
 
     # force install sysconf files
-    ${BEE_LIBEXECDIR}/bee/bee.d/bee-sysconf install --force ${pkg}
+    bee-sysconf install --force ${pkg}
 
     run_hooks post-install ${pkg}
 
