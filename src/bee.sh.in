@@ -75,7 +75,7 @@ function search_tool_cmd {
 
     CMD=
 
-    for dir in ${XDG_CONFIG_HOME} ${XDG_CONFIG_DIRS} ${BEE_LIBEXECDIR} ; do
+    for dir in ${BEE_XDG_CONFIG_HOME} ${BEE_XDG_CONFIG_DIRS} ${BEE_LIBEXECDIR} ; do
         cmd="${dir}/bee/bee.d/bee-${tool}"
         if [ -x "${cmd}" ] ; then
             CMD=${cmd}

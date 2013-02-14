@@ -30,7 +30,7 @@ ifeq ($(notdir ${LIBEXECDIR}),bee)
 endif
 
 # default config directory
-DEFCONFDIR=${SYSCONFDIR}/default
+DEFCONFDIR=${LIBDIR}/sysconfig
 
 DESTDIR=
 

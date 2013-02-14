@@ -36,7 +36,7 @@ if ! type -p glib-compile-schemas >/dev/null 2>&1 ; then
     exit 0
 fi
 
-for dir in ${XDG_DATA_DIRS//:/ } ; do
+for dir in ${BEE_XDG_DATA_DIRS//:/ } ; do
     schema_dir=${dir}/glib-2.0/schemas
     if grep -q "file=${schema_dir}" ${content}; then
         case "${action}" in

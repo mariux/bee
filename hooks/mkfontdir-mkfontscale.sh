@@ -55,7 +55,7 @@ function update_fonts() {
     done
 }
 
-for dir in ${XDG_DATA_DIRS//:/ } ; do
+for dir in ${BEE_XDG_DATA_DIRS//:/ } ; do
     font_base_dir=${dir}/fonts
     if grep -q "file=${font_base_dir}" ${content} ; then
         case "${action}" in

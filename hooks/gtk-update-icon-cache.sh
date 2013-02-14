@@ -36,7 +36,7 @@ if ! type -p gtk-update-icon-cache >/dev/null 2>&1 ; then
     exit 0
 fi
 
-for dir in ${XDG_DATA_DIRS//:/ } ; do
+for dir in ${BEE_XDG_DATA_DIRS//:/ } ; do
     icon_base_dir=${dir}/icons
     dirs=($(sed -n -e "s,^.*file=\(${icon_base_dir}/[^/]\+\)/[^/]\+$,\1,p" ${content} | sort -u ) )
     for icon_dir in "${dirs[@]}" ; do

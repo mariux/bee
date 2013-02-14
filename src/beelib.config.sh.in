@@ -73,28 +73,55 @@ function print_warning() {
 
 function config_init_base_config() {
     : ${BEE_ROOT_REPOSITORY_PREFIX:=/usr/src/bee}
-    : ${BEE_XDG_DATADIR:=${BEE_DATADIR}}
 
     # XDG defaults defined in xdg base spec
     : ${XDG_CONFIG_HOME:=${HOME}/.config}
-    : ${XDG_CONFIG_DIRS:=/etc/xdg}
+    
+    # we do not follow the base spec here, because always including the /etc directory
+    # in the search path is not what we want to support by default.
+    # so instaed of using /etc/xdg we use $sysconfdir/xdg
+    # more then that.. we explicitly unset it when it is set to the default
+    if [ "${XDG_CONFIG_DIRS}" = "/etc/xdg" ] ; then
+        unset XDG_CONFIG_DIRS
+    fi
+
+    : ${XDG_CONFIG_DIRS:=${BEE_SYSCONFDIR}/xdg}
     : ${XDG_DATA_HOME:=${HOME}/.local/share}
     : ${XDG_DATA_DIRS:=/usr/local/share:/usr/share}
     : ${XDG_CACHE_HOME:=${HOME}/.cache}
-
-    # always append bee special dirs to XDG search path
-    XDG_CONFIG_DIRS=${XDG_CONFIG_DIRS}:${BEE_SYSCONFDIR}/xdg:${BEE_SYSCONFDIR}
-    XDG_DATA_DIRS=${XDG_DATA_DIRS}:${BEE_XDG_DATADIR}
-
-    # append bee installed defaults to config search path
-    : ${BEE_CONFIG_DIR:=${BEE_DEFCONFDIR}}
-    XDG_CONFIG_DIRS=${XDG_CONFIG_DIRS}:${BEE_CONFIG_DIR}
-
-    # remove dupes from pathes
-    XDG_CONFIG_DIRS=$(beeuniq -d : ${XDG_CONFIG_DIRS//:/ })
-    XDG_DATA_DIRS=$(beeuniq -d : ${XDG_DATA_DIRS//:/ })
 }
 
+function config_init_bee_system_config() {
+
+    if [ -n "${BEE_XDG_CONFIG_DIRS}" ] ; then
+        return 0
+    fi
+
+    BEE_XDG_CONFIG_DIRS=":${XDG_CONFIG_DIRS}"
+    BEE_XDG_CONFIG_DIRS+=":${BEE_SYSCONFDIR}"
+    BEE_XDG_CONFIG_DIRS+=":${BEE_DATADIR}/sysconfig"
+    BEE_XDG_CONFIG_DIRS+=":${BEE_DEFCONFDIR}"
+    
+    # remove dupes
+    BEE_XDG_CONFIG_DIRS=$(beeuniq -d : ${BEE_XDG_CONFIG_DIRS//:/ })
+}
+
+function config_init_bee_user_config() {
+    : ${BEE_XDG_CONFIG_HOME:=${XDG_CONFIG_HOME}}
+}
+
+function config_init_bee_data() {
+
+    if [ -n "${BEE_XDG_CONFIG_DIRS}" ] ; then
+        return 0
+    fi
+    
+    BEE_XDG_DATA_DIRS="${XDG_DATA_DIRS}"
+    BEE_XDG_DATA_DIRS+=":{BEE_DATADIR}"
+
+    # remove dupes from pathes
+    BEE_XDG_DATA_DIRS=$(beeuniq -d : ${BEE_XDG_DATA_DIRS//:/ })
+}
 
 function deprecated_mv() {
     local what=${1}
@@ -215,7 +242,7 @@ function config_load_local_config() {
 }
 
 function config_load_user_config() {
-    : ${BEE_USER_CONFIG_FILE:=${XDG_CONFIG_HOME}/bee/beerc}
+    : ${BEE_USER_CONFIG_FILE:=${BEE_CONFIG_HOME}/bee/beerc}
 
     unset BEE_USER_CONFIG_FILE_
 
@@ -239,7 +266,7 @@ function config_load_system_config() {
 
     BEE_CONFIG_FILE=""
     # system config - search and take *first* readable
-    for dir in ${XDG_CONFIG_DIRS} ; do
+    for dir in ${BEE_XDG_CONFIG_DIRS} ; do
         xdgbeerc="${dir}/bee/beerc"
         if [ -r "${xdgbeerc}" ] ; then
             : ${BEE_CONFIG_FILE:=${xdgbeerc}}
@@ -262,7 +289,7 @@ function config_set_skiplist() {
     BEE_SKIPLIST=""
 
     # skiplist - search in user and system config - take *first* readable
-    for dir in ${XDG_CONFIG_HOME} ${XDG_CONFIG_DIRS} ; do
+    for dir in ${BEE_XDG_CONFIG_HOME} ${BEE_XDG_CONFIG_DIRS} ; do
         xdgskiplist="${dir}/bee/skiplist"
         if [ -r "${xdgskiplist}" ] ; then
             : ${BEE_SKIPLIST:=${xdgskiplist}}
@@ -277,11 +304,11 @@ function config_verify_builtin_config() {
     #   - other get XDG_*_HOME defaults..
     if [ ${UID} -eq 0 ] ; then  # root
         : ${BEE_REPOSITORY_PREFIX=/usr/src/bee}
-        : ${BEE_METADIR=${BEE_XDG_DATADIR}/bee}
+        : ${BEE_METADIR=${BEE_DATADIR}/bee}
         : ${BEE_CACHEDIR=/var/cache/bee}
     else # user
         : ${BEE_REPOSITORY_PREFIX=${HOME}/.local/src/bee}
-        : ${BEE_METADIR=${XDG_DATA_HOME}/bee}
+        : ${BEE_METADIR=${BEE_XDG_DATA_HOME}/bee}
         : ${BEE_CACHEDIR=${XDG_CACHE_HOME}/bee}
     fi
 
@@ -355,7 +382,12 @@ function expand_prefix_variables() {
 }
 
 function config_init() {
+
     config_init_base_config
+    config_init_bee_system_config
+    config_init_bee_user_config
+    config_init_bee_data
+    
     config_load_local_config
     config_load_user_config
     config_load_system_config
@@ -383,6 +415,11 @@ function config_export() {
     export BEE_BEEDESTDIR
 
     export BEE_VERSION
+
+    export BEE_XDG_CONFIG_HOME
+    export BEE_XDG_CONFIG_DIRS
+    export BEE_XDG_DATA_HOME
+    export BEE_XDG_DATA_DIRS
 
     export XDG_CONFIG_HOME
     export XDG_CONFIG_DIRS

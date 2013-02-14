@@ -36,7 +36,7 @@ if ! type -p update-desktop-database >/dev/null 2>&1 ; then
     exit 0
 fi
 
-for dir in ${XDG_DATA_DIRS//:/ } ; do
+for dir in ${BEE_XDG_DATA_DIRS//:/ } ; do
     desktop_dir=${dir}/applications
     if grep -q "file=${desktop_dir}/.*\.desktop" ${content} ; then
         case "${action}" in

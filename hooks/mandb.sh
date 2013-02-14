@@ -41,7 +41,7 @@ if [ -r "${BEE_METADIR}/${pkg}/META" ] ; then
 fi
 
 : ${man_dirs:=${PKG_MANDIR}}
-: ${man_dirs:=${XDG_DATA_DIRS//:/\/man:}/man}
+: ${man_dirs:=${BEE_XDG_DATA_DIRS//:/\/man:}/man}
 
 for man_dir in $(beeuniq ${man_dirs//:/ }) ; do
     case "${action}" in

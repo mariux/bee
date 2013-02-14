@@ -138,7 +138,7 @@ function create_beefile_from_template {
     local IFS=":${IFS}"
 
     for tmpl in ${templates[@]} ; do
-        for dir in ${XDG_CONFIG_HOME} ${XDG_CONFIG_DIRS} ; do
+        for dir in ${BEE_XDG_CONFIG_HOME} ${BEE_XDG_CONFIG_DIRS} ; do
             xdgtemplate="${dir}/bee/templates/${tmpl}"
 
             if [ -r "${xdgtemplate}" ] ; then

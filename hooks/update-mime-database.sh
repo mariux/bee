@@ -36,7 +36,7 @@ if ! type -p update-mime-database >/dev/null 2>&1 ; then
     exit 0
 fi
 
-for dir in ${XDG_DATA_DIRS//:/ } ; do
+for dir in ${BEE_XDG_DATA_DIRS//:/ } ; do
     mime_dir=${dir}/mime
     if grep -q "file=${mime_dir}/packages" ${content} ; then
         case "${action}" in
