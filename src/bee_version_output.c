@@ -34,6 +34,9 @@ static void _cut_and_print(char *string, char delimiter, char opt_short)
 
     assert(string);
 
+    if (!*string)
+        return;
+
     p = s = string;
 
     printf("%s", string);
