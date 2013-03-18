@@ -48,7 +48,7 @@
 
 #define _BEE_ACCEPT_REVISION     _BEE_ACCEPT_DIGITS _BEE_ACCEPT_LOWERCASE "."
 #define _BEE_ACCEPT_FULLVERSION  _BEE_ACCEPT_DIGITS _BEE_ACCEPT_LOWERCASE "._+"
-#define _BEE_ACCEPT_FULLNAME     _BEE_ACCEPT_DIGITS _BEE_ACCEPT_ALPHA     "._+-"
+#define _BEE_ACCEPT_FULLNAME     _BEE_ACCEPT_DIGITS _BEE_ACCEPT_ALPHA     "._+-:"
 
 void bee_version_parse_start(struct bee_version *v)
 {

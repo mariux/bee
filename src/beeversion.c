@@ -260,12 +260,12 @@ int beeversion_parse(int argc, char *argv[])
     char *format;
     int mode = 0;
 
-    format   = "PKGNAME%_i=%p\n"
-               "PKGEXTRANAME%_i=%x\n"
+    format   = "PKGNAME%_i=( @P )\n"
+               "PKGEXTRANAME%_i=( @X )\n"
                "PKGEXTRANAME_UNDERSCORE%_i=%_x\n"
                "PKGEXTRANAME_DASH%_i=%-x\n"
                "PKGVERSION%_i=( @v )\n"
-               "PKGEXTRAVERSION%_i=%e\n"
+               "PKGEXTRAVERSION%_i=( @E )\n"
                "PKGEXTRAVERSION_UNDERSCORE%_i=%_e\n"
                "PKGEXTRAVERSION_DASH%_i=%-e\n"
                "PKGREVISION%_i=%r\n"

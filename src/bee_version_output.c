@@ -67,6 +67,8 @@ void bee_version_print_indexed(char *format, struct bee_version *v, int index)
     for(p=format; *p; p++) {
         if(*p == '%') {
             switch(*(++p)) {
+                case 0:
+                    return;
                 case '%':
                     printf("%%");
                     break;
@@ -144,14 +146,31 @@ void bee_version_print_indexed(char *format, struct bee_version *v, int index)
 
         if(*p == '@') {
             switch(*(++p)) {
+                case 0:
+                    return;
+                case '@':
+                    printf("@");
+                    break;
+                case 'p':
+                    _cut_and_print(v->name, ':', 0);
+                    break;
+                case 'P':
+                    _cut_and_print(v->name, ':', 1);
+                    break;
+                case 'x':
+                    _cut_and_print(v->extraname, '_', 0);
+                    break;
+                case 'X':
+                    _cut_and_print(v->extraname, '_', 1);
+                    break;
                 case 'v':
                     _cut_and_print(v->version, '.', 0);
                     break;
-                case 'e':
-                    _cut_and_print(v->extraversion, '_', 0);
-                    break;
                 case 'V':
                     _cut_and_print(v->version, '.', 1);
+                    break;
+                case 'e':
+                    _cut_and_print(v->extraversion, '_', 0);
                     break;
                 case 'E':
                     _cut_and_print(v->extraversion, '_', 1);
@@ -162,6 +181,8 @@ void bee_version_print_indexed(char *format, struct bee_version *v, int index)
 
         if(*p == '\\') {
             switch(*(++p)) {
+                case 0:
+                    return;
                 case 'n':
                     printf("\n");
                     break;
