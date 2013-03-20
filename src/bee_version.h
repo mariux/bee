@@ -37,6 +37,7 @@ struct bee_version {
     char *name;
     char *extraname;
 
+    char *versionepoch;
     char *version;
     char *extraversion;
 

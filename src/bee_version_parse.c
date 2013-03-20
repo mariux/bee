@@ -47,8 +47,9 @@
 #define _BEE_ACCEPT_ALPHA     _BEE_ACCEPT_LOWERCASE _BEE_ACCEPT_UPPERCASE
 
 #define _BEE_ACCEPT_REVISION     _BEE_ACCEPT_DIGITS _BEE_ACCEPT_LOWERCASE "."
-#define _BEE_ACCEPT_FULLVERSION  _BEE_ACCEPT_DIGITS _BEE_ACCEPT_LOWERCASE "._+"
+#define _BEE_ACCEPT_FULLVERSION  _BEE_ACCEPT_DIGITS _BEE_ACCEPT_LOWERCASE "._+:"
 #define _BEE_ACCEPT_FULLNAME     _BEE_ACCEPT_DIGITS _BEE_ACCEPT_ALPHA     "._+-:"
+
 
 void bee_version_parse_start(struct bee_version *v)
 {
@@ -87,7 +88,7 @@ void bee_version_free(struct bee_version *v)
     free(v);
 }
 
-BEE_STATIC_INLINE int _parse_setup(struct bee_version *v, char *input)
+static int _parse_setup(struct bee_version *v, char *input)
 {
     char   *s;
     size_t  len;
@@ -112,6 +113,7 @@ BEE_STATIC_INLINE int _parse_setup(struct bee_version *v, char *input)
     v->prefix       = s;
     v->name         = s;
     v->extraname    = s;
+    v->versionepoch = s;
     v->version      = s;
     v->extraversion = s;
     v->revision     = s;
@@ -121,7 +123,7 @@ BEE_STATIC_INLINE int _parse_setup(struct bee_version *v, char *input)
     return 1;
 }
 
-BEE_STATIC_INLINE short _is_local_arch(char *s) {
+static short _is_local_arch(char *s) {
     static struct utsname unm;
     static char *machine = NULL;
 
@@ -136,7 +138,7 @@ BEE_STATIC_INLINE short _is_local_arch(char *s) {
     return !strcmp(s, machine);
 }
 
-BEE_STATIC_INLINE short _is_supported_arch(char *s)
+static short _is_supported_arch(char *s)
 {
     char *supported[] = { SUPPORTED_ARCHITECTURES, NULL };
     char **a;
@@ -150,7 +152,7 @@ BEE_STATIC_INLINE short _is_supported_arch(char *s)
 }
 
 /* set v->prefix and v->name */
-BEE_STATIC_INLINE short _parse_prefix(struct bee_version *v)
+static short _parse_prefix(struct bee_version *v)
 {
     char *p;
 
@@ -172,7 +174,7 @@ BEE_STATIC_INLINE short _parse_prefix(struct bee_version *v)
     return 1;
 }
 
-BEE_STATIC_INLINE short _parse_suffix(struct bee_version *v) 
+static short _parse_suffix(struct bee_version *v) 
 {
     char *p;
 
@@ -194,7 +196,7 @@ BEE_STATIC_INLINE short _parse_suffix(struct bee_version *v)
     return 1;
 }
 
-BEE_STATIC_INLINE short _parse_arch(struct bee_version *v)
+static short _parse_arch(struct bee_version *v)
 {
     char *p;
 
@@ -204,10 +206,6 @@ BEE_STATIC_INLINE short _parse_arch(struct bee_version *v)
     p = strrchr(v->name, '.');
 
     if (!p)
-        return 0;
-
-    /* fast path: arch may not contain '-' */
-    if (strchr(p, '-'))
         return 0;
 
     if (!_is_local_arch(p+1))
@@ -221,7 +219,7 @@ BEE_STATIC_INLINE short _parse_arch(struct bee_version *v)
     return 1;
 }
 
-BEE_STATIC_INLINE short _contains_invalid_chars(char *s, char *ok)
+static short _contains_invalid_chars(char *s, char *ok)
 {
     size_t accepted;
     size_t len;
@@ -233,86 +231,125 @@ BEE_STATIC_INLINE short _contains_invalid_chars(char *s, char *ok)
     accepted = strspn(s, ok);
 
     if (accepted != len) {
-        return *(s+accepted);
+        return 1;
     }
 
     return 0;
 }
 
-static int _verify_revision_string(char *s)
+static short _is_valid_fullversion_string(char *s, short carp)
+{
+    char *p;
+
+    assert(s);
+
+    if (!*s) {
+        if (carp)
+            fprintf(stderr, "beeversion: ERROR: version is empty (%s).\n", s);
+        return 0;
+    }
+    if (!isdigit(*s)) {
+        if (carp)
+            fprintf(stderr, "beeversion: ERROR: version does not start with a digit (%s).\n", s);
+        return 0;
+    }
+    if (_contains_invalid_chars(s, _BEE_ACCEPT_FULLVERSION)) {
+        if (carp)
+            fprintf(stderr, "beeversion: ERROR version contains invalid chars (%s).\n", s);
+        return 0;
+    }
+
+    p = strchr(s, ':');
+    if (!p || !*p)
+       return 1;
+
+    p = strchr(p+1, ':');
+    if (p) {
+       if (carp)
+           fprintf(stderr, "beeversion: ERROR: version can only contain one epoch (:) (%s).\n", s);
+       return 0;
+    }
+
+    return 1;
+}
+
+static short _is_valid_revision_string(char *s, short carp)
 {
     assert(s);
 
-    if(!*s) {
-        fprintf(stderr, "beeversion: ERROR revision is empty.\n");
+    if (!*s) {
+        if (carp)
+            fprintf(stderr, "beeversion: ERROR revision is empty.\n");
         return 0;
     }
-
     if (!isdigit(*s)) {
-        fprintf(stderr, "beeversion: ERROR revision does not start with a digit (%s).\n", s);
+        if (carp)
+            fprintf(stderr, "beeversion: ERROR revision does not start with a digit (%s).\n", s);
         return 0;
     }
-
     if (_contains_invalid_chars(s, _BEE_ACCEPT_REVISION)) {
-        fprintf(stderr, "beeversion: ERROR revision contains invalid chars (%s).\n", s);
+        if (carp)
+            fprintf(stderr, "beeversion: ERROR revision contains invalid chars (%s).\n", s);
         return 0;
     }
-
     return 1;
 }
 
-static int _verify_fullversion_string(char *s)
+static short _is_valid_fullname_string(char *s, short carp)
 {
-    size_t accepted;
-    size_t len;
-
     assert(s);
 
-    if (!isdigit(*s)) {
-        fprintf(stderr, "beeversion: ERROR version does not start with a digit (%s).\n", s);
+    if (!*s) {
+        if (carp)
+            fprintf(stderr, "beeversion: ERROR name is empty.\n");
         return 0;
     }
-
-    len      = strlen(s);
-    accepted = strspn(s, _BEE_ACCEPT_FULLVERSION);
-
-    if (accepted != len) {
-        fprintf(stderr, "beeversion: ERROR version contains invalid chars (%s).\n", s);
-        return 0;
-    }
-
-    return 1;
-}
-
-static int _verify_fullname_string(char *s)
-{
-    size_t accepted;
-    size_t len;
-
-    assert(s);
-
     if (!isalpha(*s)) {
-        fprintf(stderr, "beeversion: ERROR name does not start with an alphabetic character (%s).\n", s);
+        if (carp)
+            fprintf(stderr, "beeversion: ERROR name does not start with an alphabetic character (%s).\n", s);
         return 0;
     }
-
-    len      = strlen(s);
-    accepted = strspn(s, _BEE_ACCEPT_FULLNAME);
-
-    if (accepted != len) {
-        fprintf(stderr, "beeversion: ERROR name contains invalid chars (%s).\n", s);
+    if (_contains_invalid_chars(s, _BEE_ACCEPT_FULLNAME)) {
+        if (carp)
+            fprintf(stderr, "beeversion: ERROR name contains invalid chars (%s).\n", s);
         return 0;
     }
 
     return 1;
 }
 
-BEE_STATIC_INLINE int _parse_pkgfullversion(struct bee_version *v)
+static int _verify_pkg_string(char *s)
+{
+    char *p;
+
+    for (p=s; *p; p++) {
+        if (*p != ':' && *p != '_' && *p != '-')
+            continue;
+
+        if (*(p+1) != ':' && *(p+1) != '_' && *(p+1) != '-')
+            continue;
+
+        fprintf(stderr, "beeversion: ERROR pkg contains invalid sequence (%c%c).\n", *p, *(p+1));
+        return 0;
+    }
+
+    return 1;
+}
+
+
+static int _parse_pkgfullversion(struct bee_version *v)
 {
     char *p;
 
     assert(v);
     assert(v->version);
+
+    p = strchr(v->version, ':');
+    if (p) {
+        *p++ = 0;
+        v->versionepoch = v->version;
+        v->version = p;
+    }
 
     p = strchr(v->version, '_');
     if (p) {
@@ -323,7 +360,7 @@ BEE_STATIC_INLINE int _parse_pkgfullversion(struct bee_version *v)
     return 1;
 }
 
-BEE_STATIC_INLINE int _parse_pkgfullname(struct bee_version *v)
+static int _parse_pkgfullname(struct bee_version *v)
 {
     char *p;
 
@@ -353,7 +390,7 @@ static int _parse_pkgfullpkg(struct bee_version *v)
         return 0;
     }
 
-    if(!_verify_revision_string(revision+1))
+    if(!_is_valid_revision_string(revision+1, 0))
         return 0;
 
     *revision++ = 0;
@@ -366,14 +403,14 @@ static int _parse_pkgfullpkg(struct bee_version *v)
         goto restore_revision;
     }
 
-    if(!_verify_fullversion_string(version+1))
+    if(!_is_valid_fullversion_string(version+1, 1))
         goto restore_revision;
 
     *version++ = 0;
 
     v->version  = version;
 
-    if(!_verify_fullname_string(v->name))
+    if(!_is_valid_fullname_string(v->name, 1))
         goto restore_version;
 
     _parse_pkgfullversion(v);
@@ -389,59 +426,6 @@ restore_revision:
     return 0;
 
 }
-
-BEE_STATIC_INLINE short _is_valid_revision_string(char *s)
-{
-
-    assert(s);
-
-    if (!*s)
-       return 0;
-
-    if (!isdigit(*s))
-       return 0;
-
-    if (_contains_invalid_chars(s, _BEE_ACCEPT_REVISION))
-       return 0;
-
-    return 1;
-}
-
-BEE_STATIC_INLINE short _is_valid_fullversion_string(char *s)
-{
-
-    assert(s);
-
-    if (!*s)
-       return 0;
-
-    if (!isdigit(*s))
-       return 0;
-
-    if (_contains_invalid_chars(s, _BEE_ACCEPT_FULLVERSION))
-       return 0;
-
-    return 1;
-}
-
-/*
-static short _is_valid_fullname_string(char *s)
-{
-
-    assert(s);
-
-    if (!*s)
-        return 0;
-
-    if (!isalpha(*s))
-        return 0;
-
-    if (_contains_invalid_chars(s, _BEE_ACCEPT_FULLNAME))
-        return 0;
-
-    return 1;
-}
-*/
 
 /*
    AxBxC
@@ -474,7 +458,7 @@ static int _parse_partialpkg(struct bee_version *v)
         goto finish_parsename;
 
     /* N(AxB-C) V(NULL) R(-C) */
-    if (_is_valid_revision_string(revision+1)) {
+    if (_is_valid_revision_string(revision+1, 0)) {
         *revision++ = 0;
         version     = strrchr(v->name, '-');
         /* (2) N(AxB) V(?) R(C) */
@@ -497,11 +481,11 @@ static int _parse_partialpkg(struct bee_version *v)
 
     /* (1) N(AB-C) V(-C) R(NULL) */
     /* (2) N(A-B)  V(-B) R(C) */
-    if (_is_valid_fullversion_string(version+1)) {
+    if (_is_valid_fullversion_string(version+1, 0)) {
         *version++ = 0;
         /* (1) N(AB) V(C) R(NULL) */
         /* (2) N(A)  V(B) R(C) */
-    } else if (revision && _is_valid_fullversion_string(revision)) {
+    } else if (revision && _is_valid_fullversion_string(revision, 0)) {
         version  = revision;
         revision = NULL;
         /* (2) N(A-B)  V(C) R(NULL) */
@@ -522,8 +506,8 @@ finish_parsename:
     /* N(AxB)   V(C)    R(NULL) */
     /* N(AxBxC) V(NULL) R(NULL) */
 
-    if (!_verify_fullname_string(v->name)) {
-        /* not valid restore everything */
+    if (!_is_valid_fullname_string(v->name, 1)) {
+        /* not valid -> restore everything */
         if (version)
             *--version = '-';
 
@@ -592,6 +576,11 @@ int bee_version_parse(struct bee_version *v, char *input, int mode)
     res = _parse_setup(v, input);
     if(!res) {
         errno = ENOMEM;
+        return 0;
+    }
+
+    if (!_verify_pkg_string(v->_input)) {
+        bee_version_parse_finish(v);
         return 0;
     }
 

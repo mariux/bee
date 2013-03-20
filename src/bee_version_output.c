@@ -85,6 +85,9 @@ void bee_version_print_indexed(char *format, struct bee_version *v, int index)
                 case 'x':
                     printf("%s", v->extraname);
                     break;
+                case 'h':
+                    printf("%s", v->versionepoch);
+                    break;
                 case 'v':
                     printf("%s", v->version);
                     break;
@@ -103,6 +106,8 @@ void bee_version_print_indexed(char *format, struct bee_version *v, int index)
                         printf("_%s", v->extraname);
                     break;
                 case 'V':
+                    if(*(v->versionepoch))
+                        printf("%s:", v->versionepoch);
                     printf("%s", v->version);
                     if(*(v->extraversion))
                         printf("_%s", v->extraversion);
@@ -112,8 +117,12 @@ void bee_version_print_indexed(char *format, struct bee_version *v, int index)
                     printf("%s", v->name);
                     if(*(v->extraname))
                         printf("_%s", v->extraname);
+                    if (*(v->version))
+                        printf("-");
+                    if (*(v->versionepoch))
+                        printf("%s:", v->versionepoch);
                     if(*(v->version))
-                        printf("-%s", v->version);
+                        printf("%s", v->version);
                     if(*(v->extraversion))
                         printf("_%s", v->extraversion);
                     if(*(v->revision))
