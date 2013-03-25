@@ -46,6 +46,30 @@ struct bee_version {
     char *arch;
     char *suffix;
 };
+#ifndef MIN
+#define MIN(a,b)                                \
+        __extension__ ({                        \
+                        typeof(a) _a = (a);     \
+                        typeof(b) _b = (b);     \
+                        _a < _b ? _a : _b;      \
+                })
+#endif
+
+#ifndef MAX
+#define MAX(a,b)                                \
+        __extension__ ({                        \
+                        typeof(a) _a = (a);     \
+                        typeof(b) _b = (b);     \
+                        _a > _b ? _a : _b;      \
+                })
+#endif
+
+#define BEE_VERSION_MODE_AUTO       0
+#define BEE_VERSION_MODE_BEEPKG     1
+#define BEE_VERSION_MODE_BEEVERSION 2
+#define BEE_VERSION_MODE_BEEFILE    3
+#define BEE_VERSION_MODE_BEEPARTIAL 4
+#define BEE_VERSION_MODE_NOBEE      5
 
 #define SUPPORTED_ARCHITECTURES \
             "noarch", "any", \

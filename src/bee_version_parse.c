@@ -559,13 +559,6 @@ mode==auto:
 
 */
 
-#define BEE_VERSION_MODE_AUTO       0
-#define BEE_VERSION_MODE_BEEPKG     1
-#define BEE_VERSION_MODE_BEEVERSION 2
-#define BEE_VERSION_MODE_BEEFILE    3
-#define BEE_VERSION_MODE_BEEPARTIAL 4
-#define BEE_VERSION_MODE_NOBEE      5
-
 int bee_version_parse(struct bee_version *v, char *input, int mode)
 {
     int res;

@@ -26,6 +26,7 @@
 #include <ctype.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "bee_version.h"
 
@@ -197,8 +198,32 @@ static int _cmp_string(char *a, char *b) {
 
 static int _cmp_pkgname(struct bee_version *a, struct bee_version *b) {
     int res;
+    char *sa, *sb;
+    char *na, *nb;
+    int la, lb, len;
 
-    res = _cmp_string(a->name, b->name);
+    na = a->name;
+    nb = b->name;
+
+    sa = strchr(na, ':');
+    sb = strchr(nb, ':');
+
+    la = sa ? sa - na : strlen(na);
+    lb = sb ? sb - nb : strlen(nb);
+
+    len = MIN(la, lb);
+
+    res = strncmp(na, nb, len);
+    if (res)
+        return res;
+
+    if (na[len] == ':' && nb[len] && nb[len] != ':')
+             return -1;
+
+    if (nb[len] == ':' && na[len] && na[len] != ':')
+             return 1;
+
+    res = _cmp_string(na + len, nb + len);
     return res;
 }
 
@@ -206,6 +231,13 @@ static int _cmp_pkgextraname(struct bee_version *a, struct bee_version *b) {
     int res;
 
     res = _cmp_string(a->extraname, b->extraname);
+    return res;
+}
+
+static int _cmp_pkgversionepoch(struct bee_version *a, struct bee_version *b) {
+    int res;
+
+    res = _cmp_version_string(a->versionepoch, b->versionepoch);
     return res;
 }
 
@@ -266,6 +298,10 @@ static int _cmp_pkgfullname(struct bee_version *a, struct bee_version *b) {
 static int _cmp_pkgfullversion(struct bee_version *a, struct bee_version *b) {
     int res;
 
+    res = _cmp_pkgversionepoch(a, b);
+    if (res)
+        return res;
+
     res = _cmp_pkgversion(a, b);
     if (res)
         return res;
@@ -319,7 +355,7 @@ int bee_version_compare(struct bee_version *a, struct bee_version *b) {
 
     assert(a);
     assert(b);
-
+    
     res = _cmp_pkgfullpkg(a, b);
     if (res)
         return res;
