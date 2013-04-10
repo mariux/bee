@@ -28,6 +28,9 @@
 #include <string.h>
 #include <assert.h>
 
+#include <sysexits.h>
+
+#include "bee_getopt.h"
 #include "bee_version.h"
 
 void print_version(void) {
@@ -70,6 +73,18 @@ int beeversion_parse(int argc, char *argv[])
     char *format;
     int mode = 0;
 
+    struct bee_getopt_ctl optctl;
+
+    struct bee_option opts[] = {
+        BEE_OPTION_NO_ARG("help", 'h'),
+        BEE_OPTION_NO_ARG("version", 'V'),
+        BEE_OPTION_REQUIRED_ARG("format", 'f'),
+        BEE_OPTION_END
+    };
+
+    int i;
+    int opt;
+
     format   = "PKGNAME%_i=( @P )\n"
                "PKGEXTRANAME%_i=( @X )\n"
                "PKGEXTRANAME_UNDERSCORE%_i=%_x\n"
@@ -86,6 +101,27 @@ int beeversion_parse(int argc, char *argv[])
                "PKGFULLPKG%_i=%F\n"
                "PKGALLPKG%_i=%A\n"
                "PKGSUFFIX%_i=%s\n";
+
+    bee_getopt_init(&optctl, argc, argv, opts);
+
+    optctl.flags = BEE_FLAG_SKIPUNKNOWN|BEE_FLAG_STOPONNOOPT|BEE_FLAG_STOPONUNKNOWN;
+
+    while((opt=bee_getopt(&optctl, &i)) != BEE_GETOPT_END) {
+
+        if (opt == BEE_GETOPT_ERROR) {
+            exit(EX_USAGE);
+        }
+
+        switch(opt) {
+           case 'f':
+               format = optctl.optarg;
+               break;
+        }
+    }
+
+    argv = &optctl.argv[optctl.optind];
+    argc = optctl.argc-optctl.optind;
+
 
     return _beeversion_do_parse(argc, argv, format, mode);
 }
