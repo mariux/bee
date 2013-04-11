@@ -27,230 +27,616 @@
 #include <string.h>
 #include <ctype.h>
 #include <assert.h>
+#include <errno.h>
 
 #include <sys/utsname.h>
 
 #include "bee_version.h"
 
+#define EXTRA_UNKNOWN 200
+#define EXTRA_ALPHA   1
+#define EXTRA_BETA    2
+#define EXTRA_RC      3
+#define EXTRA_NONE    4
+#define EXTRA_PATCH   5
+#define EXTRA_ANY     6
 
-char parse_extra(struct beeversion *v)
+#define _BEE_ACCEPT_DIGITS    "0123456789"
+#define _BEE_ACCEPT_LOWERCASE "abcdefghijklmnopqrstuvwxyz"
+#define _BEE_ACCEPT_UPPERCASE "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+#define _BEE_ACCEPT_ALPHA     _BEE_ACCEPT_LOWERCASE _BEE_ACCEPT_UPPERCASE
+
+#define _BEE_ACCEPT_REVISION     _BEE_ACCEPT_DIGITS _BEE_ACCEPT_LOWERCASE "."
+#define _BEE_ACCEPT_FULLVERSION  _BEE_ACCEPT_DIGITS _BEE_ACCEPT_LOWERCASE "._+:"
+#define _BEE_ACCEPT_FULLNAME     _BEE_ACCEPT_DIGITS _BEE_ACCEPT_ALPHA     "._+-:"
+
+
+void bee_version_parse_start(struct bee_version *v)
 {
-    struct extra_version extra[] = {
-        { "alpha", EXTRA_ALPHA, 5 },
-        { "a",     EXTRA_ALPHA, 1 },
-        { "beta",  EXTRA_BETA,  4 },
-        { "b",     EXTRA_BETA,  1 },
-        { "rc",    EXTRA_RC,    2 },
-        { "patch", EXTRA_PATCH, 5 },
-        { "p",     EXTRA_PATCH, 1 },
-        { NULL,    EXTRA_ANY,   0 }
-    };
-
-    struct extra_version *ev;
-    char                 *s;
-
     assert(v);
-    assert(v->extraversion);
+    memset(v, 0, sizeof(*v));
+}
 
-    s  = v->extraversion;
-    ev = extra;
+void bee_version_parse_finish(struct bee_version *v)
+{
+    assert(v);
+    free(v->_input);
+    v->_input = NULL;
+}
 
-    if(!*s) {
-        v->extraversion_typ = EXTRA_NONE;
-        v->extraversion_nr  = s;
-#ifdef DEBUG
-        printf(stderr, "parse_extra(%s) = %d, '%s'",
-            v->extraversion, v->extraversion_typ, v->extraversion_nr);
-#endif
-        return(1);
+void bee_version_parse_reset(struct bee_version *v)
+{
+    bee_version_parse_finish(v);
+    bee_version_parse_start(v);
+}
+
+struct bee_version *bee_version_alloc(void)
+{
+    struct bee_version *v;
+
+    v = malloc(sizeof(*v));
+
+    if(v)
+        bee_version_parse_start(v);
+
+    return v;
+}
+
+void bee_version_free(struct bee_version *v)
+{
+    bee_version_parse_finish(v);
+    free(v);
+}
+
+static int _parse_setup(struct bee_version *v, char *input)
+{
+    char   *s;
+    size_t  len;
+
+    assert(input);
+    assert(v);
+
+    bee_version_parse_reset(v);
+
+    s = strdup(input);
+
+    if (!s) {
+        perror("strdup");
+        return 0;
     }
 
-    while(ev->string && strncmp(ev->string, s, ev->length))
-        ev++;
+    v->_input = s;
 
-    v->extraversion_typ = ev->priority;
-    v->extraversion_nr  = s + ev->length;
+    len  = strlen(s);
+    s   += len;
 
-#ifdef DEBUG
-        printf(stderr, "parse_extra(%s) = %d, '%s'",
-            v->extraversion, v->extraversion_typ, v->extraversion_nr);
-#endif
-    return(1);
+    v->prefix       = s;
+    v->name         = s;
+    v->extraname    = s;
+    v->versionepoch = s;
+    v->version      = s;
+    v->extraversion = s;
+    v->revision     = s;
+    v->arch         = s;
+    v->suffix       = s;
+
+    return 1;
 }
-/*
- * IN: string: pointer to versionstring..
- *          v: pointer to version structure..
- */
-void init_version(char *string, struct beeversion *v)
+
+static short _is_local_arch(char *s) {
+    static struct utsname unm;
+    static char *machine = NULL;
+
+    if (!machine) {
+        if(uname(&unm)) {
+            perror("uname");
+            return 0;
+        }
+        machine = unm.machine;
+    }
+
+    return !strcmp(s, machine);
+}
+
+static short _is_supported_arch(char *s)
 {
-    char *s;
+    char *supported[] = { SUPPORTED_ARCHITECTURES, NULL };
+    char **a;
+
+    for(a = supported; *a; a++) {
+        if(strcmp(s, *a))
+            continue;
+        return 1;
+    }
+    return 0;
+}
+
+/* set v->prefix and v->name */
+static short _parse_prefix(struct bee_version *v)
+{
+    char *p;
+
+    assert(v);
+    assert(v->_input);
+
+    p = strrchr(v->_input, '/');
+
+    if (!p) {
+        v->name = v->_input;
+        return 0;
+    }
+
+    *p = 0;
+
+    v->prefix = v->_input;;
+    v->name   = p+1;
+
+    return 1;
+}
+
+static short _parse_suffix(struct bee_version *v) 
+{
+    char *p;
+
+    assert(v);
+    assert(v->name);
+
+    p = strstr(v->name, ".bee");
+
+    if (!p)
+        p = strstr(v->name, ".iee");
+
+    if (!p)
+        return 0;
+
+    *p = 0;
+
+    v->suffix = p+1;
+
+    return 1;
+}
+
+static short _parse_arch(struct bee_version *v)
+{
+    char *p;
+
+    assert(v);
+    assert(v->name);
+
+    p = strrchr(v->name, '.');
+
+    if (!p)
+        return 0;
+
+    if (!_is_local_arch(p+1))
+        if (!_is_supported_arch(p+1))
+            return 0;
+
+    v->arch = p+1;
+
+    *p = 0;
+
+    return 1;
+}
+
+static short _contains_invalid_chars(char *s, char *ok)
+{
+    size_t accepted;
     size_t len;
 
-    assert(string);
-    assert(v);
+    assert(s);
+    assert(ok);
 
-    if(! (v->string=strdup(string))) {
-        perror("strdup");
-        exit(254);
+    len      = strlen(s);
+    accepted = strspn(s, ok);
+
+    if (accepted != len) {
+        return 1;
     }
 
-    s   = v->string;
-    len = strlen(s);
+    return 0;
+}
 
-    v->pkgname          = s+len;
-    v->subname          = s+len;
-    v->version          = s+len;
-    v->extraversion     = s+len;
-    v->extraversion_nr  = s+len;
-    v->pkgrevision      = s+len;
-    v->arch             = s+len;
-    v->suffix           = s+len;
-    v->extraversion_typ = EXTRA_UNKNOWN;
+static short _is_valid_fullversion_string(char *s, short carp)
+{
+    char *p;
+
+    assert(s);
+
+    if (!*s) {
+        if (carp)
+            fprintf(stderr, "beeversion: ERROR: version is empty (%s).\n", s);
+        return 0;
+    }
+    if (!isdigit(*s)) {
+        if (carp)
+            fprintf(stderr, "beeversion: ERROR: version does not start with a digit (%s).\n", s);
+        return 0;
+    }
+    if (_contains_invalid_chars(s, _BEE_ACCEPT_FULLVERSION)) {
+        if (carp)
+            fprintf(stderr, "beeversion: ERROR version contains invalid chars (%s).\n", s);
+        return 0;
+    }
+
+    p = strchr(s, ':');
+    if (!p || !*p)
+       return 1;
+
+    p = strchr(p+1, ':');
+    if (p) {
+       if (carp)
+           fprintf(stderr, "beeversion: ERROR: version can only contain one epoch (:) (%s).\n", s);
+       return 0;
+    }
+
+    return 1;
+}
+
+static short _is_valid_revision_string(char *s, short carp)
+{
+    assert(s);
+
+    if (!*s) {
+        if (carp)
+            fprintf(stderr, "beeversion: ERROR revision is empty.\n");
+        return 0;
+    }
+    if (!isdigit(*s)) {
+        if (carp)
+            fprintf(stderr, "beeversion: ERROR revision does not start with a digit (%s).\n", s);
+        return 0;
+    }
+    if (_contains_invalid_chars(s, _BEE_ACCEPT_REVISION)) {
+        if (carp)
+            fprintf(stderr, "beeversion: ERROR revision contains invalid chars (%s).\n", s);
+        return 0;
+    }
+    return 1;
+}
+
+static short _is_valid_fullname_string(char *s, short carp)
+{
+    assert(s);
+
+    if (!*s) {
+        if (carp)
+            fprintf(stderr, "beeversion: ERROR name is empty.\n");
+        return 0;
+    }
+    if (!isalpha(*s)) {
+        if (carp)
+            fprintf(stderr, "beeversion: ERROR name does not start with an alphabetic character (%s).\n", s);
+        return 0;
+    }
+    if (_contains_invalid_chars(s, _BEE_ACCEPT_FULLNAME)) {
+        if (carp)
+            fprintf(stderr, "beeversion: ERROR name contains invalid chars (%s).\n", s);
+        return 0;
+    }
+
+    return 1;
+}
+
+static int _verify_pkg_string(char *s)
+{
+    char *p;
+
+    for (p=s; *p; p++) {
+        if (*p != ':' && *p != '_' && *p != '-')
+            continue;
+
+        if (*(p+1) != ':' && *(p+1) != '_' && *(p+1) != '-')
+            continue;
+
+        fprintf(stderr, "beeversion: ERROR pkg contains invalid sequence (%c%c).\n", *p, *(p+1));
+        return 0;
+    }
+
+    return 1;
+}
+
+
+static int _parse_pkgfullversion(struct bee_version *v)
+{
+    char *p;
+
+    assert(v);
+    assert(v->version);
+
+    p = strchr(v->version, ':');
+    if (p) {
+        *p++ = 0;
+        v->versionepoch = v->version;
+        v->version = p;
+    }
+
+    p = strchr(v->version, '_');
+    if (p) {
+        *p++ = 0;
+        v->extraversion = p;
+    }
+
+    return 1;
+}
+
+static int _parse_pkgfullname(struct bee_version *v)
+{
+    char *p;
+
+    assert(v);
+    assert(v->name);
+
+    p = strchr(v->name, '_');
+    if (p) {
+        *p++ = 0;
+        v->extraname = p;
+    }
+
+    return 1;
+}
+
+static int _parse_pkgfullpkg(struct bee_version *v)
+{
+    char *revision;
+    char *version;
+
+    assert(v);
+    assert(v->name);
+
+    revision = strrchr(v->name, '-');
+    if (!revision) {
+        fprintf(stderr, "beeversion: ERROR can't find revision when parsing pkgfullpkg (%s).\n", v->name);
+        return 0;
+    }
+
+    if(!_is_valid_revision_string(revision+1, 0))
+        return 0;
+
+    *revision++ = 0;
+
+    v->revision = revision;
+
+    version = strrchr(v->name, '-');
+    if (!version) {
+        fprintf(stderr, "beeversion: ERROR can't find version when parsing pkgfullpkg (%s).\n", v->name);
+        goto restore_revision;
+    }
+
+    if(!_is_valid_fullversion_string(version+1, 1))
+        goto restore_revision;
+
+    *version++ = 0;
+
+    v->version  = version;
+
+    if(!_is_valid_fullname_string(v->name, 1))
+        goto restore_version;
+
+    _parse_pkgfullversion(v);
+    _parse_pkgfullname(v);
+
+    return 1;
+
+restore_version:
+    *--version = '-';
+
+restore_revision:
+    *--revision = '-';
+    return 0;
+
 }
 
 /*
- * IN: string: pointer to versionstring..
- *          v: pointer to version structure
- *
- * OUT: filled structure on success..
- *
- * RETURN: 0  on success
- *         >0 error at position x
- *
- */
-int parse_version(char *string,  struct beeversion *v)
+   AxBxC
+
+   REV(C) -Y-> VER(B) -Y-> NAME(A) =Y=> N-V-R => N(A) V(B) R(C)
+    |           |          |
+    |           |          N-> SYNTAX ERROR => N() V() R()
+    |           |
+    N-----------N-> VER(C) -Y-> NAME(AxB) =Y=> N-V => N(AxB) V(C) R()
+                     |          |
+    (restore AxBxC)->|          N-> SYNTAX ERROR => N() V() R()
+                     |
+                     N-> NAME(AxBxC) =Y=> N => N(AxBxC) V() R()
+                         |
+                         N-> SYNTAX ERROR => N() V() R()
+*/
+
+static int _parse_partialpkg(struct bee_version *v)
 {
-    char   *p, *s;
-    char   *version_or_revision;
+    char *revision = NULL;
+    char *version  = NULL;
 
-    init_version(string, v);
+    assert(v);
+    assert(v->name);
 
-    s = v->string;
+    revision = strrchr(v->name, '-');
 
-    /* p-v-r   p-v   v */
+    /* N(AxBxC) V(NULL) R(NULL) */
+    if (!revision) /* N(ABC) V(NULL) R(NULL) */
+        goto finish_parsename;
 
-    /* extract basename */
-    if((p=strrchr(s,'/'))) {
-        s = p+1;
-    }
-
-    /* extract suffix .bee* */
-    if((p=strstr(s, ".bee"))) {
-        v->suffix = p+1;
-        *p=0;
-    } else if((p=strstr(s, ".iee"))) {
-        v->suffix = p+1;
-        *p=0;
-    }
-
-    /* extract architecture if known.. */
-    if((p=strrchr(s, '.')) && !strchr(++p, '-')) {
-        struct utsname unm;
-        char           *arch[] = { SUPPORTED_ARCHITECTURES, NULL };
-        char           **a;
-
-        if(uname(&unm)) {
-             perror("uname");
-             exit(1);
-        }
-
-        if(!strcmp(p, unm.machine)) {
-            v->arch = p;
-            *(p-1)  = 0;
-        }
-
-        for(a=arch; *(p-1) && *a; a++) {
-            if(strcmp(p, *a))
-                continue;
-
-            v->arch = p;
-            *(p-1)  = 0;
-        }
-    }
-
-    /* do split pkg */
-
-    if((p=strrchr(s, '-'))) {
-        version_or_revision = p+1;
-        *p=0;
-
-        /* check for empty version_or_revision */
-        if(!*version_or_revision)
-            return(p-s+1);
-
-        /* first part ist pname (will be checked later) */
-        v->pkgname = s;
-
-        /* version_or_revision must start with a digit */
-        if(!isdigit(*version_or_revision)) {
-            return(p-s+1);
-        }
-
-        /* if there is another dash
-        **   revision is version_or_revision
-        **   version  is p+1
-        ** else
-        **   revision is empty
-        **   version  is version_or_revision
-        */
-        if((p=strrchr(s, '-'))) {
-            int  r_isdigit = 1;
-            char *r;
-
-            /* check if revision matches ^[0-9]+$ */
-
-            for(r=version_or_revision; *r; r++) {
-                if(!isdigit(*r)) {
-                    r_isdigit=0;
-                    break;
-                }
-            }
-
-            if(!r_isdigit)
-                p = NULL;
-
-
-            if(r_isdigit && !isdigit(*(p+1)))
-                p = NULL;
-        }
-
-        if(p) {
-            v->version     = p+1;
-            *p=0;
-
-            if(!*(v->version) || *(v->version) == '_')
-                return(p-s+1);
-
-            v->pkgrevision = version_or_revision;
-
-        } else {
-            v->version = version_or_revision;
-        }
+    /* N(AxB-C) V(NULL) R(-C) */
+    if (_is_valid_revision_string(revision+1, 0)) {
+        *revision++ = 0;
+        version     = strrchr(v->name, '-');
+        /* (2) N(AxB) V(?) R(C) */
     } else {
-        if(!isdigit(*s)) {
-            return(1);
+        version  = revision;
+        revision = NULL;
+        /* (1) N(AB-C) V(-C) R(NULL) */
+    }
+
+    /* (1) N(AB-C) V(-C) R(NULL) */
+    /* (2) N(AxB)  V(?)  R(C)    */
+    if (!version) {
+        /* (2) N(AB)   V(NULL) R(C)    */
+        *--revision = '-';
+        version    = revision;
+        revision   = NULL;
+        /* (2 => 1) N(AB-C) V(-C) R(NULL) */
+    }
+    /* else: (2) N(A-B)  V(-B) R(C) */
+
+    /* (1) N(AB-C) V(-C) R(NULL) */
+    /* (2) N(A-B)  V(-B) R(C) */
+    if (_is_valid_fullversion_string(version+1, 0)) {
+        *version++ = 0;
+        /* (1) N(AB) V(C) R(NULL) */
+        /* (2) N(A)  V(B) R(C) */
+    } else if (revision && _is_valid_fullversion_string(revision, 0)) {
+        version  = revision;
+        revision = NULL;
+        /* (2) N(A-B)  V(C) R(NULL) */
+    } else {
+        version  = NULL;
+        /* (1) N(AB-C) V(NULL) R(NULL) */
+        /* (2) N(A-B)  V(NULL) R(C) */
+        if (revision) {
+            *--revision = '-';
+            revision    = NULL;
+            /* (2) N(A-B-C) V(NULL) R(NULL) */
         }
-        v->version = s;
     }
 
-    /* check pname or version */
-    if(!*s || *s == '_')
-        return(1);
+finish_parsename:
 
-    if((p=strchr(v->version, '_'))) {
-        *p=0;
-        v->extraversion=p+1;
-        if(!*(v->extraversion))
-            return(p-s+1);
+    /* N(A)     V(B)    R(C)    */
+    /* N(AxB)   V(C)    R(NULL) */
+    /* N(AxBxC) V(NULL) R(NULL) */
+
+    if (!_is_valid_fullname_string(v->name, 1)) {
+        /* not valid -> restore everything */
+        if (version)
+            *--version = '-';
+
+        if (revision)
+            *--revision = '-';
+
+        v->name = v->extraname;
+        return 0;
     }
 
-    if(v->pkgname && (p=strchr(v->pkgname, '_'))) {
-        *p=0;
-        v->subname=p+1;
-        if(!*(v->subname))
-            return(p-s+1);
+    if (version) {
+        v->version = version;
+        _parse_pkgfullversion(v);
     }
 
-    parse_extra(v);
-    return(0);
+    if (revision)
+        v->revision = revision;
+
+    _parse_pkgfullname(v);
+    return 1;
+}
+
+static int _parse_nobee(struct bee_version *v)
+{
+    assert(0);
+    return 0;
+}
+
+/*
+
+beeversion [parse] <pkg> [<pkg> ..]
+   --mode auto (default)
+   --mode bee-pkg
+   --mode bee-version
+   --mode bee-file
+   --mode bee-partial
+   --mode no-bee
+
+mode==auto:
+  suffix starts with 'bee.tar.' => mode = bee-pkg -> [prefix/]PKGALLPKG.suffix
+  suffix eq 'bee' => mode = bee-file -> assume [prefix/]PKGFULLPKG[.arch].suffix
+  arch is valid => mode = bee-version  -> assume PKGFULLPKG.arch[.suffix]
+
+  contains no -[0-9] => mode = bee-partial -> assume PKGFULLNAME
+  contains  1 -[0-9] => mode = bee-partial -> assume PKGFULLNAME-PKGFULLVERSION
+  contains  2 -[0-9] =>
+     PKGREVISION contains no '_' => mode = bee-version -> assume PKGFULLNAME-PKGFULLVERSION-PKGREVISION
+     PKGREVISION contains    '_' => mode = bee-partial -> assume PKGFULLNAME-PKGFULLVERSION
+
+*/
+
+int bee_version_parse(struct bee_version *v, char *input, int mode)
+{
+    int res;
+
+    assert(v);
+    assert(input);
+
+    res = _parse_setup(v, input);
+    if(!res) {
+        errno = ENOMEM;
+        return 0;
+    }
+
+    if (!_verify_pkg_string(v->_input)) {
+        bee_version_parse_finish(v);
+        return 0;
+    }
+
+    _parse_prefix(v);
+    _parse_suffix(v);
+    _parse_arch(v);
+
+    if (mode == BEE_VERSION_MODE_AUTO) {
+        if (*v->suffix && !strncmp(v->suffix+1, "ee.tar.", 7)) {
+            mode = BEE_VERSION_MODE_BEEPKG;
+        } else if (!strcmp(v->suffix, "bee")) {
+            mode = BEE_VERSION_MODE_BEEFILE;
+        } else if (*v->arch) {
+            mode = BEE_VERSION_MODE_BEEVERSION;
+        } else {
+            mode = BEE_VERSION_MODE_BEEPARTIAL;
+        }
+    }
+
+    switch (mode) {
+        case BEE_VERSION_MODE_BEEPKG:
+            if (!(*v->arch))
+                fprintf(stderr, "beeversion: WARNING no arch defined when parsing bee-pkg (%s).\n", input);
+            if (strncmp(v->suffix+1, "ee.tar.", 7))
+                fprintf(stderr, "beeversion: WARNING wrong suffix defined when parsing bee-pkg (%s).\n", input);
+            if(_parse_pkgfullpkg(v))
+                return 1;
+            break;
+
+        case BEE_VERSION_MODE_BEEFILE:
+            if (strcmp(v->suffix, "bee"))
+                fprintf(stderr, "beeversion: WARNING wrong suffix defined when parsing bee-file (%s).\n", input);
+            if(_parse_pkgfullpkg(v))
+                return 1;
+            break;
+
+        case BEE_VERSION_MODE_BEEVERSION:
+            if (*v->prefix)
+                fprintf(stderr, "beeversion: WARNING prefix defined when parsing bee-version (%s).\n", input);
+            if (*v->suffix)
+                fprintf(stderr, "beeversion: WARNING suffix defined when parsing bee-version (%s).\n", input);
+            if(_parse_pkgfullpkg(v))
+                return 1;
+            break;
+
+        case BEE_VERSION_MODE_BEEPARTIAL:
+            if (*v->arch)
+                if(_parse_pkgfullpkg(v))
+                    return 1;
+            if(_parse_partialpkg(v))
+                return 1;
+            break;
+
+        case BEE_VERSION_MODE_NOBEE:
+            if(_parse_nobee(v))
+                return 1;
+            break;
+
+        default:
+            assert(0);
+    }
+
+    bee_version_parse_finish(v);
+
+    return 0;
 }

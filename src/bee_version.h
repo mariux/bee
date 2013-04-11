@@ -25,42 +25,75 @@
 #ifndef _BEE_BEEVERSION_H_
 #define _BEE_BEEVERSION_H_
 
-#define BEEVERSION_MAJOR    1
-#define BEEVERSION_MINOR    3
+#define BEEVERSION_MAJOR    2
+#define BEEVERSION_MINOR    0
 #define BEEVERSION_PATCHLVL 0
 
-#include <stdlib.h>
+struct bee_version {
+    char *_input;
 
-struct beeversion {
-    char *string;
-    char *pkgname;
-    char *subname;
+    char *prefix;
+
+    char *name;
+    char *extraname;
+
+    char *versionepoch;
     char *version;
     char *extraversion;
-    int   extraversion_typ;
-    char *extraversion_nr;
-    char *pkgrevision;
+
+    char *revision;
+
     char *arch;
     char *suffix;
 };
+#ifndef MIN
+#define MIN(a,b)                                \
+        __extension__ ({                        \
+                        typeof(a) _a = (a);     \
+                        typeof(b) _b = (b);     \
+                        _a < _b ? _a : _b;      \
+                })
+#endif
 
-struct extra_version {
-    char         *string;
-    unsigned int  priority;
-    size_t        length;
-};
+#ifndef MAX
+#define MAX(a,b)                                \
+        __extension__ ({                        \
+                        typeof(a) _a = (a);     \
+                        typeof(b) _b = (b);     \
+                        _a > _b ? _a : _b;      \
+                })
+#endif
+
+#define BEE_VERSION_MODE_AUTO       0
+#define BEE_VERSION_MODE_BEEPKG     1
+#define BEE_VERSION_MODE_BEEVERSION 2
+#define BEE_VERSION_MODE_BEEFILE    3
+#define BEE_VERSION_MODE_BEEPARTIAL 4
+#define BEE_VERSION_MODE_NOBEE      5
 
 #define SUPPORTED_ARCHITECTURES \
             "noarch", "any", \
             "x86_64", "i686", "i386", "i486", "i586", \
             "alpha", "arm", "m68k", "sparc", "mips", "ppc"
 
-#define EXTRA_UNKNOWN 200
-#define EXTRA_ALPHA   1
-#define EXTRA_BETA    2
-#define EXTRA_RC      3
-#define EXTRA_NONE    4
-#define EXTRA_PATCH   5
-#define EXTRA_ANY     6
+
+#define BEE_DEPRECATED __attribute__((__deprecated__))
+
+#define BEE_STATIC_INLINE __attribute__((always_inline)) static inline
+
+void bee_version_parse_start(struct bee_version *v);
+void bee_version_parse_finish(struct bee_version *v);
+void bee_version_parse_reset(struct bee_version *v);
+struct bee_version *bee_version_alloc(void);
+void bee_version_free(struct bee_version *v);
+
+int  bee_version_parse(struct bee_version *v, char *input, int mode);
+
+int bee_version_compare(struct bee_version *a, struct bee_version *b);
+int bee_version_compare_pkgfullname(struct bee_version *a, struct bee_version *b);
+
+void bee_version_print(char *format, struct bee_version *v);
+void bee_version_print_indexed(char *format, struct bee_version *v, int index);
+
 
 #endif

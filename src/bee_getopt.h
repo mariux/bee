@@ -133,6 +133,12 @@
                        BEE_OPT_REQUIRED(req), \
                        ## __VA_ARGS__ )
 
+#define BEE_GETOPT_FINISH(optctl, argc, argv) \
+             do { \
+                 (argv) = &(optctl).argv[(optctl).optind]; \
+                 (argc) = (optctl).argc - (optctl).optind; \
+             } while(0)
+
 struct bee_option {
     char *long_opt;
     char  short_opt;

@@ -1,12 +1,16 @@
 /*
 ** beeversion - compare bee package versionnumbers
-** Copyright (C) 2010
-**       Marius Tolzmann <tolzmann@molgen.mpg.de>
-**       David Fessler <dfessler@uni-potsdam.de>
 **
-** This program is free software; you can redistribute it and/or modify
+** Copyright (C) 2010-2012
+**       Marius Tolzmann <tolzmann@molgen.mpg.de>
+**       Tobias Dreyer <dreyer@molgen.mpg.de>
+**       and other bee developers
+**
+** This file is part of bee.
+**
+** bee is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
-** the Free Software Foundation; either version 3 of the License, or
+** the Free Software Foundation, either version 3 of the License, or
 ** (at your option) any later version.
 **
 ** This program is distributed in the hope that it will be useful,
@@ -24,11 +28,14 @@
 
 #include "bee_version.h"
 
-static void cut_and_print(char *string, char delimiter, char opt_short)
+static void _cut_and_print(char *string, char delimiter, char opt_short)
 {
     char *p, *s;
 
     assert(string);
+
+    if (!*string)
+        return;
 
     p = s = string;
 
@@ -48,56 +55,38 @@ static void cut_and_print(char *string, char delimiter, char opt_short)
     printf(" %s", s);
 }
 
-void print_format(char* s, struct beeversion *v, char *filter_pkgfullname)
+void bee_version_print(char *format, struct bee_version *v)
+{
+    bee_version_print_indexed(format, v, 0);
+}
+
+void bee_version_print_indexed(char *format, struct bee_version *v, int index)
 {
     char *p;
-    size_t len;
 
-    assert(s);
-    assert(v);
-    assert(v->pkgname);
-    assert(v->subname);
-    assert(v->version);
-    assert(v->extraversion);
-    assert(v->pkgrevision);
-    assert(v->arch);
-    assert(v->suffix);
-
-    p=s;
-
-    if(filter_pkgfullname) {
-       len = strlen(v->pkgname);
-
-       if(len > strlen(filter_pkgfullname))
-           return;
-
-       if(strncmp(v->pkgname, filter_pkgfullname, len))
-           return;
-
-       p = filter_pkgfullname+len;
-
-       if((!*p && *(v->subname)) || (*p && *p++ != '_'))
-           return;
-
-       if(strcmp(p, v->subname))
-           return;
-    }
-
-    for(p=s; *p; p++) {
+    for(p=format; *p; p++) {
         if(*p == '%') {
             switch(*(++p)) {
+                case 0:
+                    return;
                 case '%':
                     printf("%%");
                     break;
+                case 'i':
+                    printf("%d", index);
+                    break;
                 case 'p':
-                    printf("%s", v->pkgname);
+                    printf("%s", v->name);
                     break;
                 case 's':
                     if(*(v->suffix))
                         printf(".%s", v->suffix);
                     break;
                 case 'x':
-                    printf("%s", v->subname);
+                    printf("%s", v->extraname);
+                    break;
+                case 'h':
+                    printf("%s", v->versionepoch);
                     break;
                 case 'v':
                     printf("%s", v->version);
@@ -106,33 +95,38 @@ void print_format(char* s, struct beeversion *v, char *filter_pkgfullname)
                     printf("%s", v->extraversion);
                     break;
                 case 'r':
-                    printf("%s", v->pkgrevision);
+                    printf("%s", v->revision);
                     break;
                 case 'a':
                     printf("%s", v->arch);
                     break;
                 case 'P':
-                    printf("%s", v->pkgname);
-                    if(*(v->subname))
-                        printf("_%s", v->subname);
+                    printf("%s", v->name);
+                    if(*(v->extraname))
+                        printf("_%s", v->extraname);
                     break;
                 case 'V':
+                    if(*(v->versionepoch))
+                        printf("%s:", v->versionepoch);
                     printf("%s", v->version);
                     if(*(v->extraversion))
                         printf("_%s", v->extraversion);
                     break;
                 case 'F':
                 case 'A':
-                    if(*(v->pkgname))
-                        printf("%s", v->pkgname);
-                    if(*(v->subname))
-                        printf("_%s", v->subname);
+                    printf("%s", v->name);
+                    if(*(v->extraname))
+                        printf("_%s", v->extraname);
+                    if (*(v->version))
+                        printf("-");
+                    if (*(v->versionepoch))
+                        printf("%s:", v->versionepoch);
                     if(*(v->version))
-                        printf("-%s", v->version);
+                        printf("%s", v->version);
                     if(*(v->extraversion))
                         printf("_%s", v->extraversion);
-                    if(*(v->pkgrevision))
-                        printf("-%s", v->pkgrevision);
+                    if(*(v->revision))
+                        printf("-%s", v->revision);
                     if(*p == 'A' && *(v->arch))
                         printf(".%s", v->arch);
                     break;
@@ -140,13 +134,18 @@ void print_format(char* s, struct beeversion *v, char *filter_pkgfullname)
             if (*p) {
                 switch(*(p+1)) {
                     case 'x':
-                        if (*(v->subname))
-                            printf("%c%s", *p, v->subname);
+                        if (*(v->extraname))
+                            printf("%c%s", *p, v->extraname);
                         p++;
                         continue;
                     case 'e':
                         if (*(v->extraversion))
                             printf("%c%s", *p, v->extraversion);
+                        p++;
+                        continue;
+                    case 'i':
+                        if (index)
+                            printf("%c%d", *p, index);
                         p++;
                         continue;
                 }
@@ -156,17 +155,34 @@ void print_format(char* s, struct beeversion *v, char *filter_pkgfullname)
 
         if(*p == '@') {
             switch(*(++p)) {
-                case 'v':
-                    cut_and_print(v->version, '.', 0);
+                case 0:
+                    return;
+                case '@':
+                    printf("@");
                     break;
-                case 'e':
-                    cut_and_print(v->extraversion, '_', 0);
+                case 'p':
+                    _cut_and_print(v->name, ':', 0);
+                    break;
+                case 'P':
+                    _cut_and_print(v->name, ':', 1);
+                    break;
+                case 'x':
+                    _cut_and_print(v->extraname, '_', 0);
+                    break;
+                case 'X':
+                    _cut_and_print(v->extraname, '_', 1);
+                    break;
+                case 'v':
+                    _cut_and_print(v->version, '.', 0);
                     break;
                 case 'V':
-                    cut_and_print(v->version, '.', 1);
+                    _cut_and_print(v->version, '.', 1);
+                    break;
+                case 'e':
+                    _cut_and_print(v->extraversion, '_', 0);
                     break;
                 case 'E':
-                    cut_and_print(v->extraversion, '_', 1);
+                    _cut_and_print(v->extraversion, '_', 1);
                     break;
             }
             continue;
@@ -174,6 +190,8 @@ void print_format(char* s, struct beeversion *v, char *filter_pkgfullname)
 
         if(*p == '\\') {
             switch(*(++p)) {
+                case 0:
+                    return;
                 case 'n':
                     printf("\n");
                     break;
@@ -194,4 +212,3 @@ void print_format(char* s, struct beeversion *v, char *filter_pkgfullname)
 
     } /* for *p */
 }
-

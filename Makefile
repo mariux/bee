@@ -127,7 +127,7 @@ build: shellscripts buildtypes cprograms manpages
 
 SHELLSCRIPTS=$(PROGRAMS_SHELL) $(HELPER_BEE_SHELL) $(HELPER_SHELL)
 
-BEEVERSION_OBJECTS=beeversion.o bee_version_parse.o bee_version_compare.o bee_version_output.o
+BEEVERSION_OBJECTS=beeversion.o bee_version_parse.o bee_version_compare.o bee_version_output.o bee_getopt.o
 BEESEP_OBJECTS=beesep.o
 BEECUT_OBJECTS=beecut.o
 BEEUNIQ_OBJECTS=beeuniq.o
